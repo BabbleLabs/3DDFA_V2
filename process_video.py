@@ -21,7 +21,7 @@ face_count_dump_file_path = 'dumps/face_count.csv'
 face_orientation_dump_file_path = 'dumps/face_position.csv'
 mouth_position_dump_file_path = 'dumps/mouth_position.csv'
 
-def dump_mouth_coordinates(ver, i, mouth_position_dump_file):
+def dump_mouth_coordinates(ver, i, face_idx, mouth_position_dump_file):
     """
         Dump mouth position into the file
     """
@@ -33,17 +33,16 @@ def dump_mouth_coordinates(ver, i, mouth_position_dump_file):
             coordinate_numeric_value = ver[coordinate_index][mouth_interest_point_index]
             coordinates_of_points_of_interest[mouth_interest_point_index][coordinate_index] = str(coordinate_numeric_value)
         point_of_interest_coordinate_strings = coordinates_of_points_of_interest[mouth_interest_point_index]
-        position_information_string = ",".join([str(i), "0", str(mouth_interest_point_index), *point_of_interest_coordinate_strings.values()]) + '\n'
+        position_information_string = ",".join([str(i), str(face_idx), str(mouth_interest_point_index), *point_of_interest_coordinate_strings.values()]) + '\n'
         mouth_position_dump_file.write(position_information_string) # write into the dumps file
 
-def dump_face_orientation(param_lst, i, face_orientation_dump_file):
+def dump_face_orientation(param, i, face_idx, face_orientation_dump_file):
     """
         Dump face orientation into the file
     """
-    param = param_lst[0]
     P, pose = calc_pose(param) # P is a rotation matrix, pose are Euler angles
     pose_list_string = list(map(str, pose)) # create a list with all values converted to string types
-    pose_string_stripped = ','.join([str(i), "0",*pose_list_string]) + '\n' # join with relative timestamp to form one string
+    pose_string_stripped = ','.join([str(i), str(face_idx), *pose_list_string]) + '\n' # join with relative timestamp to form one string
     face_orientation_dump_file.write(pose_string_stripped) # Write the string into the dump file
 
 def main(args):
@@ -136,9 +135,13 @@ def main(args):
 
             if args.dump_results is True: # dump the information about the number of faces into a text file
                 face_count_dump_file.write(str(relative_timestamp) + ',' + str(face_count) + '\n') # format: one number per iteration, each in new line
-                if face_count == 1: # peform dumping of mouth coordinates if we have exactly one face (for now)
-                    dump_mouth_coordinates(ver, relative_timestamp, mouth_position_dump_file)
-                    dump_face_orientation(param_lst, relative_timestamp, face_orientation_dump_file)
+                if face_count > 0: # perform dumping of mouth coordinates and face orientation for all detected faces
+                    # Get reconstructed vertices for all faces
+                    all_vers = tddfa.recon_vers(param_lst, roi_box_lst, dense_flag=dense_flag)
+                    # Dump data for each detected face
+                    for face_idx, (param, ver_face) in enumerate(zip(param_lst, all_vers)):
+                        dump_mouth_coordinates(ver_face, relative_timestamp, face_idx, mouth_position_dump_file)
+                        dump_face_orientation(param, relative_timestamp, face_idx, face_orientation_dump_file)
 
             pre_ver = ver  # for tracking
 
