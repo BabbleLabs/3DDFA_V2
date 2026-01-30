@@ -10,6 +10,7 @@ import yaml
 from collections import deque
 from utils.tddfa_util import str2bool
 from utils.pose import calc_pose
+import os
 
 from FaceBoxes import FaceBoxes
 from TDDFA import TDDFA
@@ -23,17 +24,20 @@ mouth_position_dump_file_path = 'dumps/mouth_position.csv'
 
 def dump_mouth_coordinates(ver, i, face_idx, mouth_position_dump_file):
     """
-        Dump mouth position into the file
+        Dump all facial landmark positions into the file (68 points)
     """
     coordinates_of_points_of_interest = dict()
-    mouth_interest_points_index_range = range(60,68) # the indices of points that represent mouth
-    for mouth_interest_point_index in mouth_interest_points_index_range: # every point of the mouth
-        coordinates_of_points_of_interest[mouth_interest_point_index] = dict()
-        for coordinate_index in range(3): # coordinates (x, y, z) (?)
-            coordinate_numeric_value = ver[coordinate_index][mouth_interest_point_index]
-            coordinates_of_points_of_interest[mouth_interest_point_index][coordinate_index] = str(coordinate_numeric_value)
-        point_of_interest_coordinate_strings = coordinates_of_points_of_interest[mouth_interest_point_index]
-        position_information_string = ",".join([str(i), str(face_idx), str(mouth_interest_point_index), *point_of_interest_coordinate_strings.values()]) + '\n'
+    # Save all 68 facial landmark points (0-67)
+    # 0-16: Jaw line, 17-21: Right eyebrow, 22-26: Left eyebrow
+    # 27-35: Nose, 36-41: Right eye, 42-47: Left eye, 48-67: Mouth
+    all_points_index_range = range(0, 68)  # all 68 facial landmarks
+    for point_index in all_points_index_range:
+        coordinates_of_points_of_interest[point_index] = dict()
+        for coordinate_index in range(3): # coordinates (x, y, z)
+            coordinate_numeric_value = ver[coordinate_index][point_index]
+            coordinates_of_points_of_interest[point_index][coordinate_index] = str(coordinate_numeric_value)
+        point_of_interest_coordinate_strings = coordinates_of_points_of_interest[point_index]
+        position_information_string = ",".join([str(i), str(face_idx), str(point_index), *point_of_interest_coordinate_strings.values()]) + '\n'
         mouth_position_dump_file.write(position_information_string) # write into the dumps file
 
 def dump_face_orientation(param, i, face_idx, face_orientation_dump_file):
@@ -68,6 +72,18 @@ def main(args):
     reader = imageio.get_reader(args.video_fp) # offline video reader
     metadata = reader.get_meta_data()
     video_framerate = metadata['fps']
+    
+    # Count total frames for audio processing
+    total_frames = metadata.get('nframes', 0)
+    if total_frames == 0:
+        # Fallback: count frames manually
+        print("Counting frames...")
+        for _ in reader:
+            total_frames += 1
+        reader.close()
+        reader = imageio.get_reader(args.video_fp)
+    
+    print(f"Video info: {total_frames} frames at {video_framerate:.2f} fps")
 
     # the simple implementation of average smoothing by looking ahead by n_next frames
     # assert the frames of the video >= n
@@ -79,11 +95,14 @@ def main(args):
     # run
     dense_flag = args.opt in ('2d_dense', '3d')
     pre_ver = None
-    with open(face_count_dump_file_path, mode='w') as face_count_dump_file, open(face_orientation_dump_file_path, mode='w') as face_orientation_dump_file, open(mouth_position_dump_file_path, mode='w') as mouth_position_dump_file:
+    with open(face_count_dump_file_path, mode='w') as face_count_dump_file, \
+         open(face_orientation_dump_file_path, mode='w') as face_orientation_dump_file, \
+         open(mouth_position_dump_file_path, mode='w') as mouth_position_dump_file:
         # Dump headers of the messages into dump files
         face_count_dump_file.write(",".join(["seconds","face_count\n"]))
         face_orientation_dump_file.write(",".join(["seconds","face_idx","roll","pitch","yaw\n"]))
         mouth_position_dump_file.write(",".join(["seconds","face_idx","point_type","x","y","z\n"]))
+        
         for i, frame in tqdm(enumerate(reader)):
             relative_timestamp = i / video_framerate
             ver = None # this is in case we do not recognise a face, otherwise this value is overriden
