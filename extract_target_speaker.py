@@ -13,6 +13,18 @@ the output waveform.
 import argparse
 import os
 import sys
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+LOCAL_CACHE = SCRIPT_DIR / ".cache"
+os.environ.setdefault("HF_HOME", str(LOCAL_CACHE / "huggingface"))
+
+import huggingface_hub
+_orig_hf_hub_download = huggingface_hub.hf_hub_download
+def _patched_hf_hub_download(*args, **kwargs):
+    kwargs.pop("use_auth_token", None)
+    return _orig_hf_hub_download(*args, **kwargs)
+huggingface_hub.hf_hub_download = _patched_hf_hub_download
 
 import torch
 import torch.nn.functional as F
@@ -97,10 +109,12 @@ def main():
     from speechbrain.inference.separation import SepformerSeparation
     from speechbrain.inference.speaker import EncoderClassifier
 
+    sb_cache = LOCAL_CACHE / "speechbrain-models"
+
     print("Loading SepFormer separation model ...")
     separator = SepformerSeparation.from_hparams(
         source=args.sep_model,
-        savedir=f"pretrained_models/{args.sep_model.split('/')[-1]}",
+        savedir=str(sb_cache / args.sep_model.split("/")[-1]),
         run_opts={"device": args.device},
     )
     sep_sr = separator.hparams.sample_rate
@@ -108,7 +122,7 @@ def main():
     print("Loading ECAPA-TDNN speaker encoder ...")
     spk_encoder = EncoderClassifier.from_hparams(
         source=args.spk_model,
-        savedir=f"pretrained_models/{args.spk_model.split('/')[-1]}",
+        savedir=str(sb_cache / args.spk_model.split("/")[-1]),
         run_opts={"device": args.device},
     )
     spk_sr = 16000

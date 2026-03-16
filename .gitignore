@@ -112,3 +112,8 @@ facenet/target/
 
 # Facenet Jupyter Notebook
 facenet/.ipynb_checkpoints/
+
+# TSE artifacts (model weights, venvs, caches -- shared across TSE branches)
+.cache/
+pretrained_models/
+solospeech-venv/
