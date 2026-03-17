@@ -6,10 +6,20 @@ clear; clc; close all;
 % singleTalk = [2.49 13.14; 25.19 37.79];
 % doubleTalk = [13.22 25.01];
 
+% audioPath = 'inputs/';
+% audioName = 'example_4.wav';
+% singleTalk = [0.85 12.44; 13.82 23.34; 24.58 37.29; 38.36 49.38; 50.30 52.61];
+% doubleTalk = [];
+
 audioPath = 'inputs/';
-audioName = 'example_9.wav';
-singleTalk = [0.01 1.04; 12.32 20.22; 33.09 34.13; 35.54 41.49; 47.59 49.76];
-doubleTalk = [1.14 11.8; 20.41 32.67; 43.42 47.48];
+audioName = 'example_7.wav';
+singleTalk = [0.72 3.32; 11.32 15.19; 36.27 38.98; 40.99 44.17];
+doubleTalk = [3.36 11.19; 15.57 36.16; 39.14 40.99; 44.33 53.81];
+
+% audioPath = 'inputs/';
+% audioName = 'example_9.wav';
+% singleTalk = [0.01 1.04; 12.32 20.22; 33.09 34.13; 35.54 41.49; 47.59 49.76];
+% doubleTalk = [1.14 11.8; 20.41 32.67; 43.42 47.48];
 
 % audioPath = 'inputs/';
 % audioName = 'example_10.wav';
