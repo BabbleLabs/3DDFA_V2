@@ -300,8 +300,8 @@ footer { text-align: center; margin-top: 3rem; color: var(--text2); font-size: .
     <div class="arrow">&darr;</div>
 
     <div class="layer">
-        <div class="layer-box output">Output &mdash; Softmax &rarr; argmax &rarr; {silence, single, overlap}</div>
-        <div class="layer-details">3-class prediction per frame</div>
+        <div class="layer-box output">Output &mdash; argmax &rarr; {silence, single, overlap}</div>
+        <div class="layer-details">3-class prediction per frame (argmax over raw logits)</div>
     </div>
 </div>
 </div>
@@ -340,6 +340,26 @@ The model processes one frame every 10&thinsp;ms at 100&thinsp;frames/s.</p>
     The cost is dominated by the two 32&rarr;32 and 64&rarr;64 convolution layers (68.2% combined),
     which operate on the largest spatial feature maps. At 100 frames/s (10 ms hop),
     the model requires <strong>&asymp;1.57 GMACs/s</strong> &mdash; well within real-time budget even on embedded CPUs.
+</div>
+
+<div class="info-box" style="margin-top:0.5rem;">
+    <strong>Streaming inference &mdash; potential savings:</strong>
+    The figures above assume a <em>full, independent forward pass</em> per frame (worst-case / upper-bound).
+    In practice, consecutive context windows overlap by 14 out of 15 mel frames (93&thinsp;%).
+    A <strong>streaming (incremental) CNN</strong> implementation could cache intermediate feature maps
+    and recompute only the slice affected by the single new mel frame entering the window.
+    <br><br>
+    <strong>Estimated marginal cost per frame with caching:</strong><br>
+    &bull; <em>Block&nbsp;1</em> (Conv&nbsp;#1 + Conv&nbsp;#2): recompute &asymp;2&ndash;3&thinsp;/&thinsp;15 output rows &rarr; <strong>&asymp;85&thinsp;% savings</strong><br>
+    &bull; <em>Block&nbsp;2</em> (Conv&nbsp;#3 + Conv&nbsp;#4): after MaxPool&thinsp;2&times;2 the shift maps to &asymp;1&thinsp;/&thinsp;7 rows &rarr; <strong>&asymp;70&ndash;80&thinsp;% savings</strong><br>
+    &bull; <em>Block&nbsp;3</em> (Conv&nbsp;#5): feature map is already small (3&times;10) &mdash; moderate savings<br>
+    &bull; <em>AdaptiveAvgPool + FC</em>: can be updated incrementally (old_sum &minus; removed + added)<br>
+    <br>
+    Overall, the amortised cost of processing each additional frame could be roughly
+    <strong>3&ndash;5&times; lower</strong> (&asymp;3&ndash;5&thinsp;MMACs/frame) compared to the naive per-frame pass.
+    This would reduce throughput requirements from &asymp;1.57&thinsp;GMACs/s to <strong>&asymp;0.3&ndash;0.5&thinsp;GMACs/s</strong>.
+    However, this requires a custom streaming implementation &mdash; the current PyTorch code
+    processes each context window as an independent tensor.
 </div>
 </div>
 
