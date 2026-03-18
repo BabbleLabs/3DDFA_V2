@@ -1,3 +1,6 @@
 [submodule "SoloSpeech"]
 	path = SoloSpeech
 	url = https://github.com/WangHelin1997/SoloSpeech.git
+[submodule "speechbrain"]
+	path = speechbrain
+	url = https://github.com/speechbrain/speechbrain.git
