@@ -1,15 +1,75 @@
-torch
-torchvision
+# Unified requirements for the videmo suite.
+# Covers: 3DDFA_v2, FaceNet, SoloSpeech TSE, SpeechBrain TSE, WeSep TSE.
+#
+# SoloSpeech, WeSep, and WeSpeaker are installed separately with --no-deps
+# (see setup_script.sh) to avoid their strict upstream pins conflicting
+# with our Python version.  All actual runtime deps are listed here.
+
+# --- PyTorch ecosystem ---
+torch==2.6.0
+torchaudio==2.6.0
+torchvision==0.21.0
+
+# --- 3DDFA_v2 ---
 matplotlib
 numpy
-opencv-python # cv2
+opencv-python
 imageio
 imageio-ffmpeg
-pyyaml # yaml
+pyyaml
 tqdm
-argparse
 cython
-scikit-image # skimage
+scikit-image
 scipy
 onnxruntime
 gradio
+
+# --- FaceNet ---
+tensorflow>=2.0
+scikit-learn
+h5py
+Pillow
+requests
+psutil
+six
+
+# --- SoloSpeech runtime deps ---
+pytorch-lightning>=2.4.0
+diffusers>=0.30
+librosa
+speechbrain>=1.0.2
+python_speech_features
+wandb
+soundfile
+huggingface_hub
+torch-ema
+torch-optimizer
+torch-stoi
+torchmetrics
+torchsde
+pesq
+pandas
+einops
+alias_free_torch
+vector_quantize_pytorch
+
+# --- SoloSpeech corrector backbone (Fast-GeCo score_models) ---
+git+https://github.com/WangHelin1997/Fast-GeCo.git#subdirectory=score_models
+
+# --- SoloSpeech VAE deps (descript-audiotools runtime deps) ---
+# descript-audiotools itself is installed with --no-deps in setup_script.sh
+# because it pins protobuf<5 which conflicts with tensorflow>=6.31.1.
+# Its actual runtime deps are listed here.
+argbind
+flatten-dict
+julius
+markdown2
+pyloudnorm
+randomname
+tensorboard
+
+# --- WeSep / WeSpeaker runtime deps ---
+kaldiio
+silero-vad
+hdbscan
+umap-learn

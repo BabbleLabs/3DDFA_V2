@@ -113,7 +113,15 @@ facenet/target/
 # Facenet Jupyter Notebook
 facenet/.ipynb_checkpoints/
 
-# TSE artifacts (model weights, venvs, caches -- shared across TSE branches)
+# Virtual environment
+.videmo-venv/
+
+# Legacy venvs (no longer used)
+3ddfa-venv/
+facenet/facenet-venv/
+solospeech-venv/
+
+# TSE artifacts (model weights, caches)
 .cache/
 pretrained_models/
-solospeech-venv/
+wesep_out/

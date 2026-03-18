@@ -1,8 +1,9 @@
-#! /bin/bash
+#!/bin/bash
 
 # Before running the script, you need to:
 # 1. Set the paths below (make sure they are absolute paths)
 # 2. Prepare all the repositories, including audio processing pipeline
+# 3. Activate the virtual environment:  source .videmo-venv/bin/activate
 
 # Set up variables (absolute paths)
 TDDFA_V2_DIRECTORY_PATH="$(pwd)/"
@@ -30,19 +31,14 @@ BASENAME="$(basename "${VIDEO_PATH%.*}")"
 cp "$AUDIO_PIPELINE_DIRECTORY_PATH/${BASENAME}"*_txfeOut.wav dumps/
 
 # Obtain video information from 3DDFA_V2
-source 3ddfa-venv/bin/activate
 python3 process_video.py -f "$VIDEO_PATH" --dump_results=true
-deactivate
 
 # Obtain face embeddings from the video
 cd "$FACENET_DIRECTORY_PATH"
-source facenet-venv/bin/activate
 ./run_identify_speakers.sh models/20180402-114759 "$VIDEO_PATH" "$TDDFA_V2_DIRECTORY_PATH/enrollment-avatars/" --threshold 0.5 -o "$TDDFA_V2_DIRECTORY_PATH/dumps/speaker_identification.csv" -m "$TDDFA_V2_DIRECTORY_PATH/dumps/mouth_position.csv"
-deactivate
 
 # Render the video with all the information
 cd "$TDDFA_V2_DIRECTORY_PATH"
-source 3ddfa-venv/bin/activate
 # Extract face embeddings pre-render
 python3 extract_face_embeddings.py -i "$VIDEO_PATH" --dumps_dir dumps -o face_embeddings.npz
 
@@ -53,5 +49,4 @@ OUTPUT_NAME="outputs/$(basename "${VIDEO_PATH%.*}")_output.${VIDEO_PATH##*.}"
 DEBUG_OUTPUT_NAME="outputs/$(basename "${VIDEO_PATH%.*}")_output_debug.${VIDEO_PATH##*.}"
 python3 multiface_distance_render.py -i "$VIDEO_PATH" -o "$OUTPUT_NAME" --dumps_dir dumps --vvad_model=vvad_dnn_model.pt
 # python3 multiface_distance_render.py -i "$VIDEO_PATH" -o "$DEBUG_OUTPUT_NAME" --dumps_dir dumps --vvad_model=vvad_dnn_model.pt --debug-mode
-deactivate
 echo "Done!"

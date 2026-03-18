@@ -4,3 +4,6 @@
 [submodule "speechbrain"]
 	path = speechbrain
 	url = https://github.com/speechbrain/speechbrain.git
+[submodule "wesep"]
+	path = wesep
+	url = https://github.com/wenet-e2e/wesep.git
