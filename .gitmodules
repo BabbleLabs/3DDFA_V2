@@ -1,0 +1,3 @@
+[submodule "SoloSpeech"]
+	path = SoloSpeech
+	url = https://github.com/WangHelin1997/SoloSpeech.git
