@@ -41,6 +41,8 @@ import cv2
 import numpy as np
 from PIL import Image
 
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
+
 import tensorflow as tf
 if hasattr(tf, 'compat') and hasattr(tf.compat, 'v1'):
     tf = tf.compat.v1
@@ -258,9 +260,7 @@ def main(args):
     # ---- MTCNN (face detection) in its own TF graph ----
     print('Initializing MTCNN face detector...')
     with tf.Graph().as_default():
-        gpu_opts = tf.GPUOptions(
-            per_process_gpu_memory_fraction=args.gpu_memory_fraction
-        )
+        gpu_opts = tf.GPUOptions(allow_growth=True)
         mtcnn_sess = tf.Session(
             config=tf.ConfigProto(gpu_options=gpu_opts, log_device_placement=False)
         )
@@ -271,7 +271,10 @@ def main(args):
     print('Loading FaceNet model from %s ...' % args.model_dir)
     fn_graph = tf.Graph()
     with fn_graph.as_default():
-        fn_sess = tf.Session()
+        gpu_opts = tf.GPUOptions(allow_growth=True)
+        fn_sess = tf.Session(
+            config=tf.ConfigProto(gpu_options=gpu_opts, log_device_placement=False)
+        )
         with fn_sess.as_default():
             facenet.load_model(args.model_dir)
     img_ph = fn_graph.get_tensor_by_name('input:0')

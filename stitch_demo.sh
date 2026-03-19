@@ -7,8 +7,8 @@
 
 # Set up variables (absolute paths)
 TDDFA_V2_DIRECTORY_PATH="$(pwd)/"
-VIDEO_PATH="$(pwd)/inputs/example_3.mp4"
-AUDIO_PIPELINE_DIRECTORY_PATH="/work/user_data/msulewsk/data/repos/leapFox/trunk_main188/"
+VIDEO_PATH="$(pwd)/inputs/example_4.mp4"
+AUDIO_PIPELINE_DIRECTORY_PATH="/work/user_data/hboratyn/repos/leapfox"
 FACENET_DIRECTORY_PATH="$(pwd)/facenet/"
 
 # Obtain audio from video and save to the same directory

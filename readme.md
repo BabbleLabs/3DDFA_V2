@@ -13,23 +13,39 @@ A fork of 3DDFA_V2, modified for internal purposes.
    cd 3ddfa_v2
    ```
 
-2. **Import FaceNet checkpoint(s).**  
-   Get pre-trained model checkpoints from the [FaceNet GitHub repository](https://github.com/davidsandberg/facenet) (see its README for download links). Create a subdirectory for each checkpoint under `facenet/models/` and place the checkpoint files there (e.g. `facenet/models/20180402-114759/`).
-
-3. **TX Audio Pipeline**  
-   Obtain a copy of the TX audio pipeline repository. Run its demo TX pipeline script with input paths pointing at this repo’s `./input` directory. 
-
-4. **Run the setup script** to create and populate the virtual environments:
+2. **Run the setup script** to create and populate the virtual environment:
    ```bash
    ./setup_script.sh
    ```
-   This sets up the FaceNet and 3DDFA_v2 virtual environments and runs the Cython build.
+   This creates a single `.videmo-venv` virtual environment with all dependencies
+   (3DDFA_v2, FaceNet, SoloSpeech, SpeechBrain, WeSep), installs editable
+   packages, patches WeSpeaker imports, and runs the Cython/C builds
+   (`Sim3DR`, `FaceBoxes` NMS, `utils/asset/render.so`).
+
+3. **Import FaceNet checkpoint(s).**
+   Get pre-trained model checkpoints from the [FaceNet GitHub repository](https://github.com/davidsandberg/facenet) (see its README for download links). Create a subdirectory for each checkpoint under `facenet/models/` and place the checkpoint files there (e.g. `facenet/models/20180402-114759/`). The pipeline expects a directory containing `.pb` or `.meta`/`.ckpt` files.
+
+4. **Prepare enrollment avatars.**
+   Place one clear face photo (`.jpg`) per person you want to identify into `./enrollment-avatars/`. The filename (without extension) is used as the speaker label.
+
+5. **TX Audio Pipeline.**
+   Obtain a copy of the TX audio pipeline repository. You will need its path when running the demo script.
 
 ## Processing one video and rendering
 
-1. Put your video file in `./inputs` and enrollment avatars for face matching in `./enrollment-avatars`.
-2. In `stitch_demo.sh`, set the correct path to the TX audio pipeline repository (the `AUDIO_PIPELINE_DIRECTORY_PATH` variable).
-3. Run `./stitch_demo.sh` and wait for the pipeline to finish. Output will appear in `./outputs`.
+1. Activate the virtual environment:
+   ```bash
+   source .videmo-venv/bin/activate
+   ```
+2. Put your video file in `./inputs`.
+3. In `stitch_demo.sh`, set the correct paths:
+   - `VIDEO_PATH` — absolute path to your input video.
+   - `AUDIO_PIPELINE_DIRECTORY_PATH` — absolute path to the TX audio pipeline repository.
+4. Run `./stitch_demo.sh`. The script will:
+   - Extract audio from the video.
+   - Pause and ask you to run the TX audio pipeline externally; type `done` when finished.
+   - Run 3DDFA_v2 face analysis, FaceNet speaker identification, face-ID reindexing, and the final render.
+5. Output will appear in `./outputs`.
 
 ---
 

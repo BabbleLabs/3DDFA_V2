@@ -219,8 +219,8 @@ def main(args):
     # face_idx stays consistent even when FaceBoxes changes detection order.
     tracker = FaceTracker(ema_alpha=0.3, max_distance=300, drop_after_frames=30)
 
-    with open(face_count_dump_file_path, mode='w') as face_count_dump_file, \
-         open(face_orientation_dump_file_path, mode='w') as face_orientation_dump_file, \
+    with open(face_count_dump_file_path, mode='w', buffering=1) as face_count_dump_file, \
+         open(face_orientation_dump_file_path, mode='w', buffering=1) as face_orientation_dump_file, \
          open(mouth_position_dump_file_path, mode='w') as mouth_position_dump_file:
         # Dump headers of the messages into dump files
         face_count_dump_file.write(",".join(["seconds","face_count\n"]))

@@ -62,6 +62,7 @@ git+https://github.com/WangHelin1997/Fast-GeCo.git#subdirectory=score_models
 # Its actual runtime deps are listed here.
 argbind
 flatten-dict
+importlib_resources
 julius
 markdown2
 pyloudnorm
