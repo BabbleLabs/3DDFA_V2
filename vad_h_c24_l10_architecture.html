@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VAD_H_C24_L10 — Network Architecture (23 MMAC/s)</title>
+<style>
+:root {
+    --bg: #f5f7fa; --card: #fff; --border: #e1e5eb;
+    --primary: #2563eb; --primary-light: #dbeafe;
+    --accent: #f59e0b; --accent-light: #fef3c7;
+    --accent2: #10b981; --accent2-light: #d1fae5;
+    --text: #1e293b; --text2: #64748b;
+    --danger: #ef4444; --success: #22c55e;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 2rem 1rem;
+}
+.container { max-width: 1100px; margin: 0 auto; }
+
+h1 { font-size: 2rem; color: var(--primary); margin-bottom: .25rem; }
+h1 small { font-size: .9rem; color: var(--text2); font-weight: 400; }
+h2 {
+    font-size: 1.35rem; margin: 2.5rem 0 1rem;
+    padding-bottom: .4rem; border-bottom: 2px solid var(--primary);
+    color: var(--primary);
+}
+h3 { font-size: 1.05rem; margin: 1.2rem 0 .5rem; color: var(--text); }
+
+.card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+.grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; }
+.grid5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 1rem; }
+@media (max-width: 768px) { .grid2, .grid3, .grid4, .grid5 { grid-template-columns: 1fr; } }
+
+.kpi { text-align: center; padding: 1rem; }
+.kpi .value { font-size: 2rem; font-weight: 700; color: var(--primary); }
+.kpi .label { font-size: .8rem; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; }
+.kpi .sub { font-size: .78rem; color: var(--text2); margin-top: 2px; }
+.kpi.good .value { color: var(--accent2); }
+.kpi.warn .value { color: var(--accent); }
+.kpi.bad .value { color: var(--danger); }
+
+table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+th, td { padding: .55rem .75rem; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+tr:hover { background: #f8fafc; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.badge {
+    display: inline-block; padding: 2px 10px; border-radius: 12px;
+    font-size: .75rem; font-weight: 600;
+}
+.badge-fwd { background: #dbeafe; color: #1d4ed8; }
+.badge-core { background: #fef3c7; color: #92400e; }
+.badge-inv { background: #d1fae5; color: #065f46; }
+.badge-center { background: #ede9fe; color: #5b21b6; }
+.badge-right { background: #f1f5f9; color: #475569; }
+
+/* Architecture diagram */
+.arch-diagram { display: flex; flex-direction: column; align-items: center; gap: .15rem; padding: 1.5rem 0; }
+.layer { text-align: center; }
+.layer-box {
+    display: inline-block; padding: .6rem 1.6rem; border-radius: 8px;
+    font-weight: 600; font-size: .9rem; min-width: 460px;
+}
+.layer-box.input { background: #e0e7ff; color: #3730a3; border: 2px solid #a5b4fc; }
+.layer-box.fwd { background: #dbeafe; color: #1e40af; border: 2px solid #93c5fd; }
+.layer-box.fwd-center { background: #ede9fe; color: #5b21b6; border: 2px solid #c4b5fd; }
+.layer-box.core { background: #fef3c7; color: #92400e; border: 2px solid #fcd34d; }
+.layer-box.core-res { background: #fef3c7; color: #92400e; border: 2px solid #f59e0b; border-left: 6px solid #f59e0b; }
+.layer-box.inv { background: #d1fae5; color: #065f46; border: 2px solid #6ee7b7; }
+.layer-box.output { background: #f0fdf4; color: #166534; border: 2px solid #86efac; }
+.layer-details { font-size: .78rem; color: var(--text2); margin-top: 2px; }
+.arrow { font-size: 1.2rem; color: var(--text2); line-height: 1; }
+
+.section-divider {
+    width: 100%; text-align: center; padding: .5rem 0; margin: .2rem 0;
+    border-top: 1px dashed var(--border);
+    font-size: .72rem; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--text2);
+}
+
+/* Info box */
+.info-box {
+    background: #f8fafc; border: 1px solid var(--border); border-left: 4px solid var(--primary);
+    border-radius: 6px; padding: 1rem 1.2rem; margin: 1rem 0; font-size: .88rem; color: var(--text2);
+}
+.info-box strong { color: var(--text); }
+
+code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: .85em; }
+.mono { font-family: 'Cascadia Code', 'Fira Code', monospace; }
+footer { text-align: center; margin-top: 3rem; color: var(--text2); font-size: .8rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ════════════════════ HEADER ════════════════════ -->
+<h1>VAD_H_C24_L10 &mdash; Network Architecture<br><small>Classification VAD with Mixed Alignment &mdash; 1D Convolutional Encoder-Decoder</small></h1>
+
+<div class="grid5" style="margin-top:1.2rem;">
+    <div class="card kpi"><div class="value">23.27</div><div class="label">MMAC/s</div><div class="sub">@&thinsp;16&thinsp;kHz input</div></div>
+    <div class="card kpi"><div class="value">77,960</div><div class="label">Parameters</div><div class="sub">&asymp; 152.3 KB (16-bit)</div></div>
+    <div class="card kpi"><div class="value">64&times;</div><div class="label">Decimation</div><div class="sub">16 kHz &rarr; 250 Hz</div></div>
+    <div class="card kpi"><div class="value">9.5 ms</div><div class="label">Latency</div><div class="sub">152 samples @ 16 kHz</div></div>
+    <div class="card kpi warn"><div class="value">835 ms</div><div class="label">Receptive Field</div><div class="sub">13,360 samples</div></div>
+</div>
+
+<!-- ════════════════════ 1. OVERVIEW ════════════════════ -->
+<h2>1. Architecture Overview</h2>
+<div class="card">
+<p>
+    <strong>VAD_H_C24_L10</strong> is a 1D convolutional neural network for
+    <strong>Voice Activity Detection (VAD)</strong> with a computational budget of
+    &asymp;&thinsp;23&thinsp;MMAC/s. The network operates directly on 16&thinsp;kHz raw audio samples
+    and outputs frame-level decisions at 250&thinsp;Hz (one decision every 4&thinsp;ms).
+</p>
+<p style="margin-top:.7rem;">
+    A distinguishing feature of this architecture is its <strong>mixed alignment</strong> strategy:
+    the first three encoder layers use <strong>center alignment</strong> (symmetric padding),
+    while all remaining layers use <strong>right alignment</strong> (causal padding).
+    This produces a near-causal network with minimal right crop (only 84 samples = 5.25&thinsp;ms).
+</p>
+<p style="margin-top:.7rem;">
+    The architecture follows an <strong>encoder&ndash;core&ndash;decoder</strong> pattern with three functional sections:
+</p>
+<div class="grid3" style="margin-top:1rem;">
+    <div class="card kpi" style="border-left: 4px solid #2563eb;">
+        <div class="value" style="font-size:1.2rem; color:#2563eb;">Forward Transform</div>
+        <div class="label">Encoder (5 layers)</div>
+        <div class="sub">Downsamples input by 32&times; (stride-2 per layer)<br>Channels: 1 &rarr; 2 &rarr; 4 &rarr; 8 &rarr; 16 &rarr; 32<br>Mixed alignment (center + right)</div>
+    </div>
+    <div class="card kpi" style="border-left: 4px solid #f59e0b;">
+        <div class="value" style="font-size:1.2rem; color:#f59e0b;">Core</div>
+        <div class="label">Processing (7 layers)</div>
+        <div class="sub">1 layer stride-2 + 6 layers stride-1<br>Residual connections, 32 channels<br>Right-aligned (causal)</div>
+    </div>
+    <div class="card kpi" style="border-left: 4px solid #10b981;">
+        <div class="value" style="font-size:1.2rem; color:#10b981;">Inverse Transform</div>
+        <div class="label">Decoder (4 layers)</div>
+        <div class="sub">Maps features to output<br>Channels: 32 &rarr; 16 &rarr; 8 &rarr; 4 &rarr; 2<br>Right-aligned (causal)</div>
+    </div>
+</div>
+
+<div class="info-box">
+    <strong>Building block &mdash; ResCbr1dGen:</strong> Each layer is a <em>Residual Conv-BatchNorm-ReLU 1D</em> block.
+    In the <strong>core</strong> section, layers include a <strong>skip (residual) connection</strong> that adds the input to the output,
+    aiding gradient flow and enabling the network to learn identity mappings.
+    The <strong>forward_transform</strong> and <strong>inverse_transform</strong> layers do <em>not</em> use residual connections
+    because the channel count changes between input and output.
+</div>
+
+<div class="info-box" style="margin-top:.5rem;">
+    <strong>Mixed alignment:</strong> Layers 1&ndash;3 use <strong>center alignment</strong>
+    <span class="badge badge-center">CENTER</span>,
+    which distributes padding symmetrically and introduces a small right crop (84 samples total).
+    From layer 4 onward, all layers use <strong>right alignment</strong>
+    <span class="badge badge-right">RIGHT</span>
+    (fully causal), contributing zero additional right crop. This hybrid strategy achieves a
+    good trade-off between low latency and filter symmetry in early feature extraction.
+</div>
+</div>
+
+<!-- ════════════════════ 2. BLOCK DIAGRAM ════════════════════ -->
+<h2>2. Block Diagram</h2>
+<div class="card">
+<h3>Full Layer-by-Layer Architecture</h3>
+
+<div class="arch-diagram">
+    <!-- Input -->
+    <div class="layer">
+        <div class="layer-box input">Input &mdash; 16 kHz Audio (1 channel)</div>
+        <div class="layer-details">Raw waveform samples, 45,360 samples per block (2.835 s)</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <!-- Section: Forward Transform -->
+    <div class="section-divider"><span class="badge badge-fwd">Forward Transform</span> &mdash; Encoder</div>
+
+    <div class="layer">
+        <div class="layer-box fwd-center">Layer 1: ResCbr1dGen &mdash; Conv1d(1&rarr;2, k=128, s=2) <span class="badge badge-center">CENTER</span></div>
+        <div class="layer-details">Kernel 128, stride 2, center-aligned &mdash; 256 params, 5.790 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box fwd-center">Layer 2: ResCbr1dGen &mdash; Conv1d(2&rarr;4, k=9, s=2) <span class="badge badge-center">CENTER</span></div>
+        <div class="layer-details">Kernel 9, stride 2, center-aligned &mdash; 72 params, 0.814 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box fwd-center">Layer 3: ResCbr1dGen &mdash; Conv1d(4&rarr;8, k=9, s=2) <span class="badge badge-center">CENTER</span></div>
+        <div class="layer-details">Kernel 9, stride 2, center-aligned &mdash; 288 params, 1.627 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box fwd">Layer 4: ResCbr1dGen &mdash; Conv1d(8&rarr;16, k=9, s=2) <span class="badge badge-right">RIGHT</span></div>
+        <div class="layer-details">Kernel 9, stride 2, right-aligned &mdash; 1,152 params, 3.250 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box fwd">Layer 5: ResCbr1dGen &mdash; Conv1d(16&rarr;32, k=9, s=2) <span class="badge badge-right">RIGHT</span></div>
+        <div class="layer-details">Kernel 9, stride 2, right-aligned &mdash; 4,608 params, 6.483 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <!-- Section: Core -->
+    <div class="section-divider"><span class="badge badge-core">Core</span> &mdash; Processing (with residual connections)</div>
+
+    <div class="layer">
+        <div class="layer-box core-res">Layer 6: ResCbr1dGen &mdash; Conv1d(32&rarr;32, k=9, s=2) + Residual</div>
+        <div class="layer-details">Kernel 9, stride 2, right-aligned, residual skip &mdash; 9,216 params, 6.451 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box core-res">Layer 7: ResCbr1dGen &mdash; Conv1d(32&rarr;32, k=9, s=1) + Residual</div>
+        <div class="layer-details">Kernel 9, stride 1, right-aligned, residual skip &mdash; 9,216 params, 6.377 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box core-res">Layer 8: ResCbr1dGen &mdash; Conv1d(32&rarr;32, k=9, s=1) + Residual</div>
+        <div class="layer-details">Kernel 9, stride 1, right-aligned, residual skip &mdash; 9,216 params, 6.304 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box core-res">Layer 9: ResCbr1dGen &mdash; Conv1d(32&rarr;32, k=9, s=1) + Residual</div>
+        <div class="layer-details">Kernel 9, stride 1, right-aligned, residual skip &mdash; 9,216 params, 6.230 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box core-res">Layer 10: ResCbr1dGen &mdash; Conv1d(32&rarr;32, k=9, s=1) + Residual</div>
+        <div class="layer-details">Kernel 9, stride 1, right-aligned, residual skip &mdash; 9,216 params, 6.156 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box core-res">Layer 11: ResCbr1dGen &mdash; Conv1d(32&rarr;32, k=9, s=1) + Residual</div>
+        <div class="layer-details">Kernel 9, stride 1, right-aligned, residual skip &mdash; 9,216 params, 6.083 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box core-res">Layer 12: ResCbr1dGen &mdash; Conv1d(32&rarr;32, k=9, s=1) + Residual</div>
+        <div class="layer-details">Kernel 9, stride 1, right-aligned, residual skip &mdash; 9,216 params, 6.009 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <!-- Section: Inverse Transform -->
+    <div class="section-divider"><span class="badge badge-inv">Inverse Transform</span> &mdash; Decoder</div>
+
+    <div class="layer">
+        <div class="layer-box inv">Layer 13: ResCbr1dGen &mdash; Conv1d(32&rarr;16, k=9, s=1)</div>
+        <div class="layer-details">Kernel 9, stride 1, right-aligned &mdash; 4,608 params, 2.968 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box inv">Layer 14: ResCbr1dGen &mdash; Conv1d(16&rarr;8, k=9, s=1)</div>
+        <div class="layer-details">Kernel 9, stride 1, right-aligned &mdash; 1,152 params, 0.733 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box inv">Layer 15: ResCbr1dGen &mdash; Conv1d(8&rarr;4, k=9, s=1)</div>
+        <div class="layer-details">Kernel 9, stride 1, right-aligned &mdash; 288 params, 0.181 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box inv">Layer 16: ResCbr1dGen &mdash; Conv1d(4&rarr;2, k=128, s=1)</div>
+        <div class="layer-details">Kernel 128, stride 1, right-aligned &mdash; 1,024 params, 0.513 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <!-- Output -->
+    <div class="layer">
+        <div class="layer-box output">Output &mdash; 2 channels @ 250 Hz</div>
+        <div class="layer-details">501 output frames per block &mdash; 64&times; decimation from 16 kHz input</div>
+    </div>
+</div>
+
+<div class="info-box">
+    <strong>Symmetric kernel placement:</strong> Layer&nbsp;1 and layer&nbsp;16 both use a large kernel of 128.
+    Layer&nbsp;1 operates at the input rate (16&thinsp;kHz) for initial feature extraction, while
+    layer&nbsp;16 operates at the final decimated rate (250&thinsp;Hz) for output smoothing.
+    This &ldquo;bookend&rdquo; pattern is characteristic of encoder-decoder audio architectures.
+</div>
+</div>
+
+<!-- ════════════════════ 3. COMPLEXITY TABLE ════════════════════ -->
+<h2>3. Computational Complexity</h2>
+<div class="card">
+<h3>Per-Layer Breakdown</h3>
+<p>Multiply-Accumulate (MAC) operations per single inference pass.
+One MAC equals one multiplication plus one addition (2 FLOPs).
+The model processes 16,000 input samples per second at 16&thinsp;kHz.</p>
+
+<div class="grid4" style="margin-top:1rem;">
+    <div class="card kpi"><div class="value">65.97</div><div class="label">MMACs / block</div><div class="sub">per inference pass</div></div>
+    <div class="card kpi"><div class="value">23.27</div><div class="label">MMAC/s</div><div class="sub">real-time throughput</div></div>
+    <div class="card kpi good"><div class="value">77,960</div><div class="label">Parameters</div><div class="sub">&asymp; 152.3 KB (16-bit)</div></div>
+    <div class="card kpi warn"><div class="value">66.1%</div><div class="label">Core Section</div><div class="sub">7 layers, 43.61 MMACs</div></div>
+</div>
+
+<table style="margin-top:1rem;">
+<thead>
+<tr><th>#</th><th>Section</th><th>Layer</th><th class="num">Kernel</th><th class="num">Stride</th><th class="num">Align</th><th class="num">Res</th><th class="num">Ch In&rarr;Out</th><th class="num">Params</th><th class="num">MMACs</th><th class="num">MMAC/s</th><th class="num">%</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td><span class="badge badge-fwd">fwd</span></td><td><code>ResCbr1dGen</code></td><td class="num">128</td><td class="num">2</td><td class="num"><span class="badge badge-center">C</span></td><td class="num">&mdash;</td><td class="num">1&rarr;2</td><td class="num">256</td><td class="num">5.790</td><td class="num">2.042</td><td class="num">8.8%</td></tr>
+<tr><td>2</td><td><span class="badge badge-fwd">fwd</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">2</td><td class="num"><span class="badge badge-center">C</span></td><td class="num">&mdash;</td><td class="num">2&rarr;4</td><td class="num">72</td><td class="num">0.814</td><td class="num">0.287</td><td class="num">1.2%</td></tr>
+<tr><td>3</td><td><span class="badge badge-fwd">fwd</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">2</td><td class="num"><span class="badge badge-center">C</span></td><td class="num">&mdash;</td><td class="num">4&rarr;8</td><td class="num">288</td><td class="num">1.627</td><td class="num">0.574</td><td class="num">2.5%</td></tr>
+<tr><td>4</td><td><span class="badge badge-fwd">fwd</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">2</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&mdash;</td><td class="num">8&rarr;16</td><td class="num">1,152</td><td class="num">3.250</td><td class="num">1.146</td><td class="num">4.9%</td></tr>
+<tr><td>5</td><td><span class="badge badge-fwd">fwd</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">2</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&mdash;</td><td class="num">16&rarr;32</td><td class="num">4,608</td><td class="num">6.483</td><td class="num">2.287</td><td class="num">9.8%</td></tr>
+<tr style="border-top: 2px dashed var(--border);"><td>6</td><td><span class="badge badge-core">core</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">2</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&check;</td><td class="num">32&rarr;32</td><td class="num">9,216</td><td class="num">6.451</td><td class="num">2.276</td><td class="num">9.8%</td></tr>
+<tr><td>7</td><td><span class="badge badge-core">core</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">1</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&check;</td><td class="num">32&rarr;32</td><td class="num">9,216</td><td class="num">6.377</td><td class="num">2.250</td><td class="num">9.7%</td></tr>
+<tr><td>8</td><td><span class="badge badge-core">core</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">1</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&check;</td><td class="num">32&rarr;32</td><td class="num">9,216</td><td class="num">6.304</td><td class="num">2.224</td><td class="num">9.6%</td></tr>
+<tr><td>9</td><td><span class="badge badge-core">core</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">1</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&check;</td><td class="num">32&rarr;32</td><td class="num">9,216</td><td class="num">6.230</td><td class="num">2.198</td><td class="num">9.4%</td></tr>
+<tr><td>10</td><td><span class="badge badge-core">core</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">1</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&check;</td><td class="num">32&rarr;32</td><td class="num">9,216</td><td class="num">6.156</td><td class="num">2.172</td><td class="num">9.3%</td></tr>
+<tr><td>11</td><td><span class="badge badge-core">core</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">1</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&check;</td><td class="num">32&rarr;32</td><td class="num">9,216</td><td class="num">6.083</td><td class="num">2.146</td><td class="num">9.2%</td></tr>
+<tr><td>12</td><td><span class="badge badge-core">core</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">1</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&check;</td><td class="num">32&rarr;32</td><td class="num">9,216</td><td class="num">6.009</td><td class="num">2.120</td><td class="num">9.1%</td></tr>
+<tr style="border-top: 2px dashed var(--border);"><td>13</td><td><span class="badge badge-inv">inv</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">1</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&mdash;</td><td class="num">32&rarr;16</td><td class="num">4,608</td><td class="num">2.968</td><td class="num">1.047</td><td class="num">4.5%</td></tr>
+<tr><td>14</td><td><span class="badge badge-inv">inv</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">1</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&mdash;</td><td class="num">16&rarr;8</td><td class="num">1,152</td><td class="num">0.733</td><td class="num">0.258</td><td class="num">1.1%</td></tr>
+<tr><td>15</td><td><span class="badge badge-inv">inv</span></td><td><code>ResCbr1dGen</code></td><td class="num">9</td><td class="num">1</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&mdash;</td><td class="num">8&rarr;4</td><td class="num">288</td><td class="num">0.181</td><td class="num">0.064</td><td class="num">0.3%</td></tr>
+<tr><td>16</td><td><span class="badge badge-inv">inv</span></td><td><code>ResCbr1dGen</code></td><td class="num">128</td><td class="num">1</td><td class="num"><span class="badge badge-right">R</span></td><td class="num">&mdash;</td><td class="num">4&rarr;2</td><td class="num">1,024</td><td class="num">0.513</td><td class="num">0.181</td><td class="num">0.8%</td></tr>
+<tr style="font-weight:700; border-top:2px solid var(--primary);"><td></td><td></td><td><strong>Total</strong></td><td></td><td></td><td></td><td></td><td></td><td class="num"><strong>77,960</strong></td><td class="num"><strong>65.97</strong></td><td class="num"><strong>23.27</strong></td><td class="num"><strong>100%</strong></td></tr>
+</tbody>
+</table>
+
+<div class="info-box" style="margin-top:1rem;">
+    <strong>Note:</strong> MACs count each fused multiply+add as one operation.
+    The core layers (7&ndash;12) each contribute &asymp;9&ndash;10% of the total compute and have identical
+    architectures (32&rarr;32, k=9, s=1 + residual). Their MMACs decrease slightly layer-to-layer
+    because the feature sequence shrinks from valid convolution boundary effects.
+</div>
+</div>
+
+<!-- ════════════════════ COMPLEXITY BY SECTION ════════════════════ -->
+<div class="card">
+<h3>Complexity by Section</h3>
+
+<table>
+<tr><th style="width:30%">Section</th><th class="num"># Layers</th><th class="num">Params</th><th class="num">MMACs</th><th class="num">MMAC/s</th><th class="num">% of Total</th></tr>
+<tr><td><span class="badge badge-fwd">Forward Transform</span></td><td class="num">5</td><td class="num">6,376</td><td class="num">17.96</td><td class="num">6.34</td><td class="num">27.2%</td></tr>
+<tr><td><span class="badge badge-core">Core</span></td><td class="num">7</td><td class="num">64,512</td><td class="num">43.61</td><td class="num">15.39</td><td class="num">66.1%</td></tr>
+<tr><td><span class="badge badge-inv">Inverse Transform</span></td><td class="num">4</td><td class="num">7,072</td><td class="num">4.39</td><td class="num">1.55</td><td class="num">6.7%</td></tr>
+<tr style="font-weight:700; border-top:2px solid var(--primary);"><td><strong>Total</strong></td><td class="num"><strong>16</strong></td><td class="num"><strong>77,960</strong></td><td class="num"><strong>65.97</strong></td><td class="num"><strong>23.27</strong></td><td class="num"><strong>100%</strong></td></tr>
+</table>
+
+<div class="info-box" style="margin-top:1rem;">
+    <strong>Parameter distribution:</strong> The core section dominates both in parameters
+    (<strong>82.8%</strong>, 64,512 / 77,960) and compute (<strong>66.1%</strong>).
+    Each of the 7 core layers has 9,216 parameters (32&times;32&times;9 + bias), reflecting the wide
+    32-channel processing at the bottleneck rate.
+</div>
+</div>
+
+<!-- ════════════════════ 4. SIGNAL FLOW ════════════════════ -->
+<h2>4. Signal Flow &amp; Decimation</h2>
+<div class="card">
+<h3>Spatial Resolution Through the Network</h3>
+
+<table>
+<tr><th>Stage</th><th>Layer</th><th class="num">Product Stride</th><th class="num">Output Length</th><th class="num">Effective Rate</th><th class="num">Align</th></tr>
+<tr><td>Input</td><td>&mdash;</td><td class="num">1&times;</td><td class="num">45,360</td><td class="num">16,000 Hz</td><td></td></tr>
+<tr style="background:#f5f3ff;"><td><span class="badge badge-fwd">fwd</span> L1</td><td>Conv k=128, s=2</td><td class="num">2&times;</td><td class="num">22,617</td><td class="num">8,000 Hz</td><td class="num"><span class="badge badge-center">C</span></td></tr>
+<tr style="background:#f5f3ff;"><td><span class="badge badge-fwd">fwd</span> L2</td><td>Conv k=9, s=2</td><td class="num">4&times;</td><td class="num">11,305</td><td class="num">4,000 Hz</td><td class="num"><span class="badge badge-center">C</span></td></tr>
+<tr style="background:#f5f3ff;"><td><span class="badge badge-fwd">fwd</span> L3</td><td>Conv k=9, s=2</td><td class="num">8&times;</td><td class="num">5,649</td><td class="num">2,000 Hz</td><td class="num"><span class="badge badge-center">C</span></td></tr>
+<tr><td><span class="badge badge-fwd">fwd</span> L4</td><td>Conv k=9, s=2</td><td class="num">16&times;</td><td class="num">2,821</td><td class="num">1,000 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr><td><span class="badge badge-fwd">fwd</span> L5</td><td>Conv k=9, s=2</td><td class="num">32&times;</td><td class="num">1,407</td><td class="num">500 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr><td><span class="badge badge-core">core</span> L6</td><td>Conv k=9, s=2</td><td class="num">64&times;</td><td class="num">700</td><td class="num">250 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr style="background: #fefce8;"><td><span class="badge badge-core">core</span> L7</td><td>Conv k=9, s=1</td><td class="num">64&times;</td><td class="num">692</td><td class="num">250 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr style="background: #fefce8;"><td><span class="badge badge-core">core</span> L8</td><td>Conv k=9, s=1</td><td class="num">64&times;</td><td class="num">684</td><td class="num">250 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr style="background: #fefce8;"><td><span class="badge badge-core">core</span> L9</td><td>Conv k=9, s=1</td><td class="num">64&times;</td><td class="num">676</td><td class="num">250 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr style="background: #fefce8;"><td><span class="badge badge-core">core</span> L10</td><td>Conv k=9, s=1</td><td class="num">64&times;</td><td class="num">668</td><td class="num">250 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr style="background: #fefce8;"><td><span class="badge badge-core">core</span> L11</td><td>Conv k=9, s=1</td><td class="num">64&times;</td><td class="num">660</td><td class="num">250 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr style="background: #fefce8;"><td><span class="badge badge-core">core</span> L12</td><td>Conv k=9, s=1</td><td class="num">64&times;</td><td class="num">652</td><td class="num">250 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr style="background: #fefce8;"><td><span class="badge badge-inv">inv</span> L13</td><td>Conv k=9, s=1</td><td class="num">64&times;</td><td class="num">644</td><td class="num">250 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr style="background: #fefce8;"><td><span class="badge badge-inv">inv</span> L14</td><td>Conv k=9, s=1</td><td class="num">64&times;</td><td class="num">636</td><td class="num">250 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr style="background: #fefce8;"><td><span class="badge badge-inv">inv</span> L15</td><td>Conv k=9, s=1</td><td class="num">64&times;</td><td class="num">628</td><td class="num">250 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr style="background: #fefce8;"><td><span class="badge badge-inv">inv</span> L16</td><td>Conv k=128, s=1</td><td class="num">64&times;</td><td class="num">501</td><td class="num">250 Hz</td><td class="num"><span class="badge badge-right">R</span></td></tr>
+<tr style="font-weight:700; border-top:2px solid var(--primary);"><td>Output</td><td>&mdash;</td><td class="num">64&times;</td><td class="num">501</td><td class="num">250 Hz</td><td></td></tr>
+</table>
+
+<div class="info-box" style="margin-top:1rem;">
+    <strong>Decimation structure:</strong> The network achieves 64&times; downsampling through
+    6 stride-2 layers (2<sup>6</sup> = 64). After layer&nbsp;6 the signal reaches the final rate of 250&thinsp;Hz,
+    and layers 7&ndash;16 operate at stride&nbsp;1 (no further downsampling). The output length decreases
+    from 700 to 501 frames due to the valid-convolution boundary effects, with the largest
+    single drop (628&rarr;501) occurring at layer&nbsp;16 due to its large kernel of 128.
+</div>
+</div>
+
+<!-- ════════════════════ 5. RECEPTIVE FIELD ════════════════════ -->
+<h2>5. Receptive Field &amp; Latency</h2>
+<div class="card">
+
+<div class="grid3" style="margin-top:.5rem;">
+    <div class="card kpi"><div class="value">13,360</div><div class="label">FOV (samples)</div><div class="sub">Overall receptive field</div></div>
+    <div class="card kpi"><div class="value">835 ms</div><div class="label">FOV (time)</div><div class="sub">@ 16 kHz input rate</div></div>
+    <div class="card kpi good"><div class="value">9.5 ms</div><div class="label">Latency</div><div class="sub">152 samples @ 16 kHz</div></div>
+</div>
+
+<table style="margin-top:1rem;">
+<tr><th style="width:40%">Property</th><th style="width:30%">Samples</th><th style="width:30%">Milliseconds</th></tr>
+<tr><td>Overall FOV (Field of View)</td><td class="num">13,360</td><td class="num">835.0</td></tr>
+<tr><td>Left crop (causal direction)</td><td class="num">13,212</td><td class="num">825.8</td></tr>
+<tr><td>Right crop (non-causal)</td><td class="num">84</td><td class="num">5.3</td></tr>
+<tr><td>Latency (unquantized)</td><td class="num">152</td><td class="num">9.5</td></tr>
+<tr><td>Overall input length per block</td><td class="num">45,360</td><td class="num">2,835.0</td></tr>
+<tr><td>Output length per block</td><td class="num">501 frames</td><td class="num">2,004.0</td></tr>
+</table>
+
+<div class="info-box" style="margin-top:1rem;">
+    <strong>Near-causal architecture:</strong> Due to the <strong>mixed alignment</strong> strategy,
+    this network is <em>not</em> fully causal &mdash; the first three center-aligned layers introduce
+    a small right crop of <strong>84 samples (5.3&thinsp;ms)</strong>. This means each output decision
+    depends on 5.3&thinsp;ms of &ldquo;future&rdquo; audio. In practice, this is negligible and the
+    network can be considered near-causal with an effective latency of <strong>9.5&thinsp;ms</strong>.
+</div>
+</div>
+
+<!-- ════════════════════ 6. COMPARISON ════════════════════ -->
+<h2>6. Comparison with VAD_I_C2_L8</h2>
+<div class="card">
+<table>
+<tr><th style="width:30%">Property</th><th style="width:35%">VAD_I_C2_L8</th><th style="width:35%">VAD_H_C24_L10</th></tr>
+<tr><td>Computational cost</td><td class="num">2.03 MMAC/s</td><td class="num"><strong>23.27 MMAC/s</strong> (11.5&times;)</td></tr>
+<tr><td>Parameters</td><td class="num">5,510</td><td class="num"><strong>77,960</strong> (14.1&times;)</td></tr>
+<tr><td>Memory (16-bit)</td><td class="num">&asymp; 10.8 KB</td><td class="num"><strong>&asymp; 152.3 KB</strong></td></tr>
+<tr><td>Decimation</td><td class="num">128&times; (125 Hz)</td><td class="num"><strong>64&times;</strong> (250 Hz)</td></tr>
+<tr><td>Output rate</td><td class="num">125 Hz</td><td class="num"><strong>250 Hz</strong> (2&times; finer)</td></tr>
+<tr><td>Max channels</td><td class="num">8</td><td class="num"><strong>32</strong> (4&times;)</td></tr>
+<tr><td>Total layers</td><td class="num">12</td><td class="num"><strong>16</strong></td></tr>
+<tr><td>Encoder layers</td><td class="num">3</td><td class="num"><strong>5</strong></td></tr>
+<tr><td>Core layers</td><td class="num">7</td><td class="num">7</td></tr>
+<tr><td>Decoder layers</td><td class="num">2</td><td class="num"><strong>4</strong></td></tr>
+<tr><td>Alignment</td><td class="num">Right (fully causal)</td><td class="num"><strong>Mixed</strong> (center + right)</td></tr>
+<tr><td>Right crop</td><td class="num">0 samples</td><td class="num">84 samples (5.3 ms)</td></tr>
+<tr><td>Receptive field</td><td class="num">21,339 samples (1,333.7 ms)</td><td class="num">13,360 samples (835.0 ms)</td></tr>
+<tr><td>Latency</td><td class="num">8.0 ms</td><td class="num">9.5 ms</td></tr>
+</table>
+
+<div class="info-box" style="margin-top:1rem;">
+    <strong>Design trade-off:</strong> VAD_H_C24_L10 invests <strong>11.5&times; more compute</strong>
+    to achieve wider channel widths (32 vs 8), finer temporal resolution (250 Hz vs 125 Hz),
+    and a deeper decoder, at the cost of a slightly higher latency (9.5 vs 8.0 ms)
+    and a small non-causal component (5.3 ms right crop). The receptive field is actually
+    <strong>shorter</strong> (835 ms vs 1,334 ms) due to fewer stride-2 layers.
+</div>
+</div>
+
+<!-- ════════════════════ 7. KEY PROPERTIES ════════════════════ -->
+<h2>7. Key Design Properties</h2>
+<div class="card">
+<table>
+<tr><th style="width:30%">Property</th><th>Details</th></tr>
+<tr><td><strong>Input</strong></td><td>16 kHz mono audio, raw waveform samples</td></tr>
+<tr><td><strong>Output</strong></td><td>2 channels @ 250 Hz (one frame every 4 ms)</td></tr>
+<tr><td><strong>Decimation</strong></td><td>64&times; total (6 layers &times; stride 2)</td></tr>
+<tr><td><strong>Building block</strong></td><td><code>ResCbr1dGen</code> &mdash; Conv1d + BatchNorm + ReLU (with optional residual)</td></tr>
+<tr><td><strong>Residual connections</strong></td><td>Core layers (6&ndash;12) only &mdash; where channel count is preserved (32&rarr;32)</td></tr>
+<tr><td><strong>Kernel sizes</strong></td><td>128 (L1, L16), 9 (all other layers)</td></tr>
+<tr><td><strong>Channel progression</strong></td><td>1 &rarr; 2 &rarr; 4 &rarr; 8 &rarr; 16 &rarr; 32 &rarr; 32 &rarr;&thinsp;&hellip;&thinsp;&rarr; 32 &rarr; 16 &rarr; 8 &rarr; 4 &rarr; 2</td></tr>
+<tr><td><strong>Alignment</strong></td><td>Mixed: center (L1&ndash;L3) + right (L4&ndash;L16)</td></tr>
+<tr><td><strong>Computational budget</strong></td><td>23.27 MMAC/s (designed for &le; 10 MMAC/s budget &mdash; exceeds by 2.3&times;)</td></tr>
+<tr><td><strong>Memory footprint</strong></td><td>77,960 params &asymp; 152.3 KB (16-bit) / 304.5 KB (FP32)</td></tr>
+</table>
+
+<div class="info-box" style="margin-top:1rem;">
+    <strong>Budget note:</strong> At <strong>23.27 MMAC/s</strong>, this architecture exceeds
+    the target budget of 10 MMAC/s by a factor of <strong>2.3&times;</strong>.
+    The primary contributor is the wide 32-channel core section, which accounts for
+    66.1% of all computation. Reducing the core channel width from 32 to 24 or 16 would
+    bring the compute within budget at the potential cost of reduced modelling capacity.
+</div>
+</div>
+
+<footer>
+    VAD_H_C24_L10 Architecture Report &mdash; Generated from <code>20200116-vad-net-complexity.xlsx</code>,
+    sheet <code>20200129-VAD_H_C24_L10</code>
+</footer>
+
+</div><!-- .container -->
+</body>
+</html>

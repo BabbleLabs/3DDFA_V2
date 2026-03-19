@@ -1,0 +1,189 @@
+
+════════════════════════════════════════════════════════════════════
+  Multi-Voice VAD — VAD_H_C24_L10 Training
+════════════════════════════════════════════════════════════════════
+  Device:              cuda
+  Data dir:            multivoice_VAD_data_generation
+  Architecture:        VAD_H_C24_L10 (1D Conv Encoder-Decoder)
+  Trainable params:    79,106
+  Chunk samples:       48000  (3000 ms)
+  Output frames/chunk: 542
+  Decimation:          64×  (16 kHz → 250 Hz)
+  Frame period:        4.0 ms
+  Epochs:              200
+  Batch size:          32
+  Learning rate:       0.001
+  Overlap weight ×:    2.0
+  Augmentation:        False
+  Early stop patience: 25
+  Seed:                42
+════════════════════════════════════════════════════════════════════
+
+Step 1: Loading audio, resampling to 16 kHz, computing labels …
+
+  ── Train ──
+    [  50/300]  (8.4 s)
+    [ 100/300]  (16.5 s)
+    [ 150/300]  (25.1 s)
+    [ 200/300]  (31.8 s)
+    [ 250/300]  (38.0 s)
+    [ 300/300]  (44.0 s)
+  300 files, 1125000 frames  |  Sil=247363  Sing=566974  Ovl=310663
+
+  ── Validation ──
+    [  50/50]  (6.2 s)
+  50 files, 187500 frames  |  Sil=41724  Sing=91561  Ovl=54215
+
+  ── Test ──
+    [  50/100]  (6.1 s)
+    [ 100/100]  (12.2 s)
+  100 files, 375000 frames  |  Sil=83329  Sing=185055  Ovl=106616
+
+Step 2: Building chunk datasets …
+  Train chunks:  1,800
+  Val   chunks:  300
+  Test  chunks:  600
+
+  Class weights (after ×2.0 overlap boost):
+     Silence: 1.5160
+      Single: 0.6614
+     Overlap: 2.4142
+
+Step 3: Model summary
+VAD_H_C24_L10(
+  (fwd): ModuleList(
+    (0): ResCbr1dGen(
+      (conv): Conv1d(1, 2, kernel_size=(128,), stride=(2,), bias=False)
+      (bn): BatchNorm1d(2, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (relu): ReLU(inplace=True)
+    )
+    (1): ResCbr1dGen(
+      (conv): Conv1d(2, 4, kernel_size=(9,), stride=(2,), bias=False)
+      (bn): BatchNorm1d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (relu): ReLU(inplace=True)
+    )
+    (2): ResCbr1dGen(
+      (conv): Conv1d(4, 8, kernel_size=(9,), stride=(2,), bias=False)
+      (bn): BatchNorm1d(8, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (relu): ReLU(inplace=True)
+    )
+    (3): ResCbr1dGen(
+      (conv): Conv1d(8, 16, kernel_size=(9,), stride=(2,), bias=False)
+      (bn): BatchNorm1d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (relu): ReLU(inplace=True)
+    )
+    (4): ResCbr1dGen(
+      (conv): Conv1d(16, 32, kernel_size=(9,), stride=(2,), bias=False)
+      (bn): BatchNorm1d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (relu): ReLU(inplace=True)
+    )
+  )
+  (core): ModuleList(
+    (0): ResCbr1dGen(
+      (conv): Conv1d(32, 32, kernel_size=(9,), stride=(2,), bias=False)
+      (bn): BatchNorm1d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (relu): ReLU(inplace=True)
+    )
+    (1-6): 6 x ResCbr1dGen(
+      (conv): Conv1d(32, 32, kernel_size=(9,), stride=(1,), bias=False)
+      (bn): BatchNorm1d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (relu): ReLU(inplace=True)
+    )
+  )
+  (inv): ModuleList(
+    (0): ResCbr1dGen(
+      (conv): Conv1d(32, 16, kernel_size=(9,), stride=(1,), bias=False)
+      (bn): BatchNorm1d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (relu): ReLU(inplace=True)
+    )
+    (1): ResCbr1dGen(
+      (conv): Conv1d(16, 8, kernel_size=(9,), stride=(1,), bias=False)
+      (bn): BatchNorm1d(8, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (relu): ReLU(inplace=True)
+    )
+    (2): ResCbr1dGen(
+      (conv): Conv1d(8, 4, kernel_size=(9,), stride=(1,), bias=False)
+      (bn): BatchNorm1d(4, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (relu): ReLU(inplace=True)
+    )
+    (3): ResCbr1dGen(
+      (conv): Conv1d(4, 3, kernel_size=(128,), stride=(1,), bias=False)
+      (bn): BatchNorm1d(3, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (relu): ReLU(inplace=True)
+    )
+  )
+)
+  Trainable parameters: 79,106
+
+Step 4: Training for up to 200 epochs (early-stop patience = 25) …
+  Model selection criterion: validation overlap F1
+
+  ─────────────────────────────────────────────────────────────────────────────────
+    Ep   TrLoss   TrAcc    VLoss    VAcc  Sil-F1  Sng-F1  Ovl-F1   MacF1         LR
+  ─────────────────────────────────────────────────────────────────────────────────
+     1   0.8031  0.5855   0.7343  0.6647  0.6568  0.6268  0.7249  0.6695   1.00e-03
+    10   0.3489  0.8745   0.5509  0.7593  0.7297  0.7135  0.8379  0.7604   1.00e-03
+    20   0.2527  0.9011   0.2819  0.8746  0.8827  0.8668  0.8801  0.8765   1.00e-03
+    30   0.2035  0.9168   0.8254  0.5525  0.7966  0.3597  0.5974  0.5846   1.00e-03
+    40   0.1702  0.9312   0.2629  0.8955  0.9121  0.8939  0.8875  0.8978   5.00e-04
+    50   0.1404  0.9435   0.2796  0.8991  0.9145  0.8991  0.8893  0.9010   2.50e-04
+
+  ⏹  Early stopping at epoch 56 (no improvement for 25 epochs)
+
+  Training complete in 166.2 s
+  Best overlap F1: 0.8966 at epoch 31
+  Best model saved to: mvad_dnn_h_model.pt
+
+Step 5: Evaluating best model on TEST set …
+  Loaded best model from epoch 31
+
+════════════════════════════════════════════════════════════════════
+  TEST SET — Final Results
+════════════════════════════════════════════════════════════════════
+  Overall Accuracy: 0.8886
+  Macro F1:         0.8906
+
+  Confusion Matrix (rows = GT, cols = Predicted):
+                 Silence    Single   Overlap
+       Silence     61298      3268       366
+        Single      9081    138924     14290
+       Overlap       350      8859     88764
+
+              precision    recall  f1-score   support
+
+     Silence       0.87      0.94      0.90     64932
+      Single       0.92      0.86      0.89    162295
+     Overlap       0.86      0.91      0.88     97973
+
+    accuracy                           0.89    325200
+   macro avg       0.88      0.90      0.89    325200
+weighted avg       0.89      0.89      0.89    325200
+
+
+════════════════════════════════════════════════════════════════════
+  VALIDATION SET — Final Results (best model)
+════════════════════════════════════════════════════════════════════
+  Overall Accuracy: 0.8962
+  Macro F1:         0.8966
+
+  Confusion Matrix (rows = GT, cols = Predicted):
+                 Silence    Single   Overlap
+       Silence     29976      1964       124
+        Single      4487     70582      5947
+       Overlap       223      4127     45170
+
+              precision    recall  f1-score   support
+
+     Silence       0.86      0.93      0.90     32064
+      Single       0.92      0.87      0.90     81016
+     Overlap       0.88      0.91      0.90     49520
+
+    accuracy                           0.90    162600
+   macro avg       0.89      0.91      0.90    162600
+weighted avg       0.90      0.90      0.90    162600
+
+
+  Training history saved to: mvad_dnn_h_training_history.json
+  Best model saved to:       mvad_dnn_h_model.pt
+
+  ✓ Done!
