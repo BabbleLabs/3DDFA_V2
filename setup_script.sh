@@ -55,6 +55,21 @@ else:
     print("WARNING: wespeaker __init__.py not found, skipping patch")
 PYEOF
 
+echo "=== Installing gdown (Google Drive downloader) ==="
+pip install --cache-dir "$PIP_CACHE" gdown
+
+echo "=== Downloading FaceNet model (20180402-114759, VGGFace2) ==="
+FACENET_MODEL_DIR="$SCRIPT_DIR/facenet/models/20180402-114759"
+if [ -d "$FACENET_MODEL_DIR" ] && [ "$(ls -A "$FACENET_MODEL_DIR" 2>/dev/null)" ]; then
+    echo "  Model already exists at $FACENET_MODEL_DIR, skipping download"
+else
+    FACENET_MODEL_ZIP="$SCRIPT_DIR/facenet/models/20180402-114759.zip"
+    gdown 1EXPBSXwTaqrSC0OhUdXNmKSh9qJUQ55- -O "$FACENET_MODEL_ZIP"
+    unzip -o "$FACENET_MODEL_ZIP" -d "$SCRIPT_DIR/facenet/models/"
+    rm -f "$FACENET_MODEL_ZIP"
+    echo "  FaceNet model extracted to $FACENET_MODEL_DIR"
+fi
+
 echo "=== Running Cython build script for 3DDFA_v2 ==="
 sh ./build.sh
 

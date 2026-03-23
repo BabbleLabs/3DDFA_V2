@@ -32,6 +32,7 @@ To plug in InsightFace / FaceNet / dlib:
 """
 
 import argparse
+import os
 import numpy as np
 import pandas as pd
 import cv2
@@ -166,6 +167,70 @@ def get_embedding_placeholder(crop_bgr):
     return np.zeros(128, dtype=np.float64)
 
 
+class FaceNetEmbedder:
+    """Loads a FaceNet frozen-graph model and computes 512-d embeddings."""
+
+    FACENET_INPUT_SIZE = 160
+
+    def __init__(self, model_dir):
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
+        import tensorflow as tf
+        if hasattr(tf, 'compat') and hasattr(tf.compat, 'v1'):
+            tf = tf.compat.v1
+            tf.disable_v2_behavior()
+
+        self._graph = tf.Graph()
+        with self._graph.as_default():
+            gpu_opts = tf.GPUOptions(allow_growth=True)
+            self._sess = tf.Session(
+                config=tf.ConfigProto(gpu_options=gpu_opts,
+                                      log_device_placement=False))
+            model_exp = os.path.expanduser(model_dir)
+            pb_files = [f for f in os.listdir(model_exp) if f.endswith('.pb')]
+            if pb_files:
+                pb_path = os.path.join(model_exp, pb_files[0])
+                with tf.io.gfile.GFile(pb_path, 'rb') as f:
+                    graph_def = tf.GraphDef()
+                    graph_def.ParseFromString(f.read())
+                    tf.import_graph_def(graph_def, name='')
+            else:
+                files = os.listdir(model_exp)
+                meta_files = [s for s in files if s.endswith('.meta')]
+                if not meta_files:
+                    raise ValueError(
+                        f'No .pb or .meta file in model directory: {model_exp}')
+                meta_file = meta_files[0]
+                ckpt = tf.train.get_checkpoint_state(model_exp)
+                ckpt_file = os.path.basename(ckpt.model_checkpoint_path)
+                saver = tf.train.import_meta_graph(
+                    os.path.join(model_exp, meta_file))
+                saver.restore(self._sess,
+                              os.path.join(model_exp, ckpt_file))
+
+        self._input_ph = self._graph.get_tensor_by_name('input:0')
+        self._embeddings_t = self._graph.get_tensor_by_name('embeddings:0')
+        self._phase_ph = self._graph.get_tensor_by_name('phase_train:0')
+
+    @staticmethod
+    def _prewhiten(x):
+        mean = np.mean(x)
+        std = np.std(x)
+        std_adj = max(std, 1.0 / np.sqrt(x.size))
+        return (x - mean) / std_adj
+
+    def __call__(self, crop_bgr):
+        rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
+        resized = cv2.resize(rgb, (self.FACENET_INPUT_SIZE,
+                                   self.FACENET_INPUT_SIZE))
+        prewhitened = self._prewhiten(resized.astype(np.float64))
+        feed = {
+            self._input_ph: np.expand_dims(prewhitened, axis=0),
+            self._phase_ph: False,
+        }
+        emb = self._sess.run(self._embeddings_t, feed_dict=feed)
+        return emb[0]
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Extract face crops from video using dumps and optionally compute embeddings for stable identity."
@@ -176,9 +241,21 @@ def main():
     parser.add_argument("--crops_dir", type=str, default=None, help="If set, save crop images here (for debugging)")
     parser.add_argument("--padding", type=float, default=0.35, help="Padding around landmark bbox (ratio of width/height)")
     parser.add_argument("--no_embedding", action="store_true", help="Only save crops; do not compute embeddings (no model)")
+    parser.add_argument("--model_dir", type=str, default=None,
+                        help="Path to FaceNet model directory (frozen .pb or "
+                             ".meta/.ckpt). Produces real 512-d embeddings "
+                             "instead of placeholder zeros.")
     args = parser.parse_args()
 
-    get_embedding = None if args.no_embedding else get_embedding_placeholder
+    if args.no_embedding:
+        get_embedding = None
+    elif args.model_dir:
+        print(f"Loading FaceNet model from {args.model_dir} ...")
+        get_embedding = FaceNetEmbedder(args.model_dir)
+        print("FaceNet model loaded — will produce 512-d embeddings")
+    else:
+        get_embedding = get_embedding_placeholder
+
     extract_and_save(
         args.video,
         args.dumps_dir,
