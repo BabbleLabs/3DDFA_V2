@@ -1993,7 +1993,7 @@ def main():
                 {k: (round(v, 4) if isinstance(v, float) else v)
                  for k, v in f.items()}
                 for f in dnn_results['per_file']
-            ]
+        ]
         with open(json_path, 'w') as f:
             json.dump(report, f, indent=2, default=str)
         print(f"  Report saved → {json_path}")

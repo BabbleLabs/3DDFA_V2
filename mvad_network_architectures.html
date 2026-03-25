@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MVAD Network Architectures — V1 vs V2 Comparison</title>
+<style>
+:root {
+    --bg: #f5f7fa; --card: #fff; --border: #e1e5eb;
+    --primary: #2563eb; --primary-light: #dbeafe;
+    --accent: #f59e0b; --accent-light: #fef3c7;
+    --accent2: #10b981; --accent2-light: #d1fae5;
+    --text: #1e293b; --text2: #64748b;
+    --danger: #ef4444; --success: #22c55e;
+    --v1: #7c3aed; --v1-light: #ede9fe; --v1-border: #c4b5fd;
+    --v2: #0891b2; --v2-light: #ecfeff; --v2-border: #67e8f9;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.6; padding: 2rem 1rem;
+}
+.container { max-width: 1200px; margin: 0 auto; }
+
+h1 { font-size: 2rem; color: var(--primary); margin-bottom: .25rem; }
+h1 small { font-size: .9rem; color: var(--text2); font-weight: 400; }
+h2 {
+    font-size: 1.35rem; margin: 2.5rem 0 1rem;
+    padding-bottom: .4rem; border-bottom: 2px solid var(--primary);
+    color: var(--primary);
+}
+h3 { font-size: 1.05rem; margin: 1.2rem 0 .5rem; color: var(--text); }
+
+.card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+.grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; }
+.grid5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 1rem; }
+.grid6 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; gap: .8rem; }
+@media (max-width: 768px) { .grid2, .grid3, .grid4, .grid5, .grid6 { grid-template-columns: 1fr; } }
+
+.kpi { text-align: center; padding: 1rem; }
+.kpi .value { font-size: 2rem; font-weight: 700; color: var(--primary); }
+.kpi .label { font-size: .8rem; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; }
+.kpi .sub { font-size: .78rem; color: var(--text2); margin-top: 2px; }
+.kpi.good .value { color: var(--accent2); }
+.kpi.warn .value { color: var(--accent); }
+.kpi.bad .value { color: var(--danger); }
+
+table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+th, td { padding: .55rem .75rem; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+tr:hover { background: #f8fafc; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.badge {
+    display: inline-block; padding: 2px 10px; border-radius: 12px;
+    font-size: .75rem; font-weight: 600;
+}
+.badge-v1 { background: var(--v1-light); color: var(--v1); }
+.badge-v2 { background: var(--v2-light); color: var(--v2); }
+.badge-fwd { background: #dbeafe; color: #1d4ed8; }
+.badge-core { background: #fef3c7; color: #92400e; }
+.badge-inv { background: #d1fae5; color: #065f46; }
+.badge-cls { background: #fce7f3; color: #9d174d; }
+
+/* Architecture diagram */
+.arch-diagram { display: flex; flex-direction: column; align-items: center; gap: .15rem; padding: 1.5rem 0; }
+.layer { text-align: center; }
+.layer-box {
+    display: inline-block; padding: .6rem 1.6rem; border-radius: 8px;
+    font-weight: 600; font-size: .9rem; min-width: 440px;
+}
+.layer-box.input { background: #e0e7ff; color: #3730a3; border: 2px solid #a5b4fc; }
+.layer-box.conv-block1 { background: var(--v1-light); color: var(--v1); border: 2px solid var(--v1-border); }
+.layer-box.conv-block2 { background: #dbeafe; color: #1e40af; border: 2px solid #93c5fd; }
+.layer-box.conv-block3 { background: #fef3c7; color: #92400e; border: 2px solid #fcd34d; }
+.layer-box.classifier { background: #fce7f3; color: #9d174d; border: 2px solid #f9a8d4; }
+.layer-box.output { background: #f0fdf4; color: #166534; border: 2px solid #86efac; }
+
+.layer-box.v2-input { background: #e0e7ff; color: #3730a3; border: 2px solid #a5b4fc; }
+.layer-box.v2-ds { background: var(--v2-light); color: #0e7490; border: 2px solid var(--v2-border); }
+.layer-box.v2-ds-res { background: var(--v2-light); color: #0e7490; border: 2px solid #06b6d4; border-left: 6px solid #06b6d4; }
+.layer-box.v2-ds-last { background: #d1fae5; color: #065f46; border: 2px solid #6ee7b7; }
+.layer-box.v2-output { background: #f0fdf4; color: #166534; border: 2px solid #86efac; }
+
+.layer-details { font-size: .78rem; color: var(--text2); margin-top: 2px; }
+.arrow { font-size: 1.2rem; color: var(--text2); line-height: 1; }
+
+.section-divider {
+    width: 100%; text-align: center; padding: .5rem 0; margin: .2rem 0;
+    border-top: 1px dashed var(--border);
+    font-size: .72rem; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--text2);
+}
+
+.info-box {
+    background: #f8fafc; border: 1px solid var(--border); border-left: 4px solid var(--primary);
+    border-radius: 6px; padding: 1rem 1.2rem; margin: 1rem 0; font-size: .88rem; color: var(--text2);
+}
+.info-box strong { color: var(--text); }
+.info-box.v1 { border-left-color: var(--v1); }
+.info-box.v2 { border-left-color: var(--v2); }
+.info-box.good { border-left-color: var(--success); }
+
+code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: .85em; }
+.mono { font-family: 'Cascadia Code', 'Fira Code', monospace; }
+footer { text-align: center; margin-top: 3rem; color: var(--text2); font-size: .8rem; }
+
+/* Highlight rows */
+.highlight-v1 { background: #faf5ff !important; }
+.highlight-v2 { background: #f0fdfa !important; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ════════════════════ HEADER ════════════════════ -->
+<h1>MVAD Network Architectures<br><small>V1 (2D-CNN) vs V2 (DS-Conv1D) &mdash; Multi-Voice Activity Detection</small></h1>
+
+<div class="grid6" style="margin-top:1.2rem;">
+    <div class="card kpi bad"><div class="value">1,567</div><div class="label">V1 MMAC/s</div><div class="sub">2D-CNN on mel patches</div></div>
+    <div class="card kpi good"><div class="value">2.59</div><div class="label">V2 MMAC/s</div><div class="sub">DS-Conv1D on mel seq</div></div>
+    <div class="card kpi good"><div class="value">605&times;</div><div class="label">Reduction</div><div class="sub">V1 &rarr; V2</div></div>
+    <div class="card kpi"><div class="value">157K</div><div class="label">V1 Params</div><div class="sub">&asymp; 306 KB (16-bit)</div></div>
+    <div class="card kpi good"><div class="value">27K</div><div class="label">V2 Params</div><div class="sub">&asymp; 53 KB (16-bit)</div></div>
+    <div class="card kpi good"><div class="value">5.7&times;</div><div class="label">Param Reduction</div><div class="sub">V1 &rarr; V2</div></div>
+</div>
+
+<!-- ════════════════════ 1. OVERVIEW ════════════════════ -->
+<h2>1. Architecture Overview</h2>
+<div class="card">
+<div class="grid2">
+    <div>
+        <h3><span class="badge badge-v1">V1</span> MultivoiceVAD_CNN</h3>
+        <p>A <strong>2D CNN</strong> that treats each mel-spectrogram context window (15 frames &times; 40 mel bands)
+        as a small single-channel image. Classifies each frame <strong>independently</strong> using its local context.</p>
+        <ul style="margin-top:.5rem; padding-left:1.2rem; font-size:.9rem;">
+            <li>Input: mel patch (15 &times; 40) per frame</li>
+            <li>5 Conv2d layers + 2 FC layers</li>
+            <li>Context: 150 ms (7 past + 1 current + 7 future)</li>
+            <li>Lookahead: 70 ms</li>
+            <li>Frame-by-frame processing (no temporal sharing)</li>
+        </ul>
+    </div>
+    <div>
+        <h3><span class="badge badge-v2">V2</span> MVAD_V2 (DS-Conv1D)</h3>
+        <p>A <strong>1D depthwise-separable CNN</strong> operating on mel features along the time axis.
+        Processes entire <strong>sequences</strong> at once, sharing temporal computation across frames.</p>
+        <ul style="margin-top:.5rem; padding-left:1.2rem; font-size:.9rem;">
+            <li>Input: mel sequence (T &times; 40) &mdash; whole file or chunk</li>
+            <li>1 input projection + 5 DS-Conv blocks + 1 output head</li>
+            <li>Context: 710 ms (35 past + 1 current + 35 future)</li>
+            <li>Lookahead: 350 ms (within 1 s budget)</li>
+            <li>Sequence-to-sequence (streaming-friendly)</li>
+        </ul>
+    </div>
+</div>
+
+<div class="info-box good" style="margin-top:1rem;">
+    <strong>Key design change:</strong> V2 replaces expensive 2D convolutions on per-frame mel patches with
+    lightweight <strong>depthwise-separable 1D convolutions</strong> along the time axis.
+    This achieves a <strong>~600&times; reduction in MMAC/s</strong> while expanding the temporal receptive field
+    from 150&thinsp;ms to 710&thinsp;ms, enabling better detection of overlapping speech.
+</div>
+</div>
+
+<!-- ════════════════════ 2. V1 BLOCK DIAGRAM ════════════════════ -->
+<h2>2. V1 — Block Diagram &amp; Complexity</h2>
+<div class="card">
+<h3>MultivoiceVAD_CNN Architecture (per-frame processing)</h3>
+
+<div class="arch-diagram">
+    <div class="layer">
+        <div class="layer-box input">Input &mdash; Mel Patch (1 &times; 15 &times; 40)</div>
+        <div class="layer-details">15 context frames &times; 40 mel bands, single channel &mdash; one patch per output frame</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="section-divider"><span class="badge badge-fwd">Conv Block 1</span> &mdash; 32 channels</div>
+
+    <div class="layer">
+        <div class="layer-box conv-block1">Conv2d(1&rarr;32, 3&times;3, pad=1) + BN + ReLU</div>
+        <div class="layer-details">Output: (32, 15, 40) &mdash; 320 params, 0.173 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="layer">
+        <div class="layer-box conv-block1">Conv2d(32&rarr;32, 3&times;3, pad=1) + BN + ReLU</div>
+        <div class="layer-details">Output: (32, 15, 40) &mdash; 9,248 params, 5.530 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="layer">
+        <div class="layer-box conv-block1" style="opacity:.7; font-size:.85rem;">MaxPool2d(2) + Dropout2d(0.1)</div>
+        <div class="layer-details">Output: (32, 7, 20)</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="section-divider"><span class="badge badge-fwd">Conv Block 2</span> &mdash; 64 channels</div>
+
+    <div class="layer">
+        <div class="layer-box conv-block2">Conv2d(32&rarr;64, 3&times;3, pad=1) + BN + ReLU</div>
+        <div class="layer-details">Output: (64, 7, 20) &mdash; 18,496 params, 2.580 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="layer">
+        <div class="layer-box conv-block2">Conv2d(64&rarr;64, 3&times;3, pad=1) + BN + ReLU</div>
+        <div class="layer-details">Output: (64, 7, 20) &mdash; 36,928 params, 5.161 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="layer">
+        <div class="layer-box conv-block2" style="opacity:.7; font-size:.85rem;">MaxPool2d(2) + Dropout2d(0.1)</div>
+        <div class="layer-details">Output: (64, 3, 10)</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="section-divider"><span class="badge badge-core">Conv Block 3</span> &mdash; 128 channels</div>
+
+    <div class="layer">
+        <div class="layer-box conv-block3">Conv2d(64&rarr;128, 3&times;3, pad=1) + BN + ReLU</div>
+        <div class="layer-details">Output: (128, 3, 10) &mdash; 73,856 params, 2.212 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="layer">
+        <div class="layer-box conv-block3" style="opacity:.7; font-size:.85rem;">AdaptiveAvgPool2d(1,1)</div>
+        <div class="layer-details">Output: (128, 1, 1) &mdash; global spatial average</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="section-divider"><span class="badge badge-cls">Classifier</span></div>
+
+    <div class="layer">
+        <div class="layer-box classifier">FC(128&rarr;128) + BN + ReLU + Dropout(0.3)</div>
+        <div class="layer-details">16,768 params, 0.016 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="layer">
+        <div class="layer-box classifier">FC(128&rarr;3)</div>
+        <div class="layer-details">387 params, 0.000 MMACs</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box output">Output &mdash; 3 classes (Silence / Single / Overlap)</div>
+        <div class="layer-details">One classification per 10 ms frame</div>
+    </div>
+</div>
+</div>
+
+<!-- V1 Complexity Table -->
+<div class="card">
+<h3>V1 — Per-Layer Computational Complexity</h3>
+<p style="margin-bottom:.8rem;">Multiply-Accumulate (MAC) operations per single frame classification.
+The model processes 100 frames per second (10 ms hop).</p>
+
+<table>
+<thead>
+<tr><th>#</th><th>Section</th><th>Layer</th><th class="num">Output Shape</th><th class="num">Params</th><th class="num">MMACs/fr</th><th class="num">MMAC/s</th><th class="num">%</th></tr>
+</thead>
+<tbody>
+<tr class="highlight-v1"><td>1</td><td><span class="badge badge-fwd">Block 1</span></td><td>Conv2d(1&rarr;32, 3&times;3, pad=1)</td><td class="num">(32,15,40)</td><td class="num">320</td><td class="num">0.173</td><td class="num">17.28</td><td class="num">1.1%</td></tr>
+<tr class="highlight-v1"><td>2</td><td><span class="badge badge-fwd">Block 1</span></td><td>Conv2d(32&rarr;32, 3&times;3, pad=1)</td><td class="num">(32,15,40)</td><td class="num">9,248</td><td class="num">5.530</td><td class="num">552.96</td><td class="num">35.3%</td></tr>
+<tr><td></td><td></td><td style="color:var(--text2)">BN + ReLU + MaxPool2d(2) + Drop</td><td class="num">(32,7,20)</td><td class="num">128</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num"></td></tr>
+<tr><td>3</td><td><span class="badge badge-fwd">Block 2</span></td><td>Conv2d(32&rarr;64, 3&times;3, pad=1)</td><td class="num">(64,7,20)</td><td class="num">18,496</td><td class="num">2.580</td><td class="num">258.05</td><td class="num">16.5%</td></tr>
+<tr><td>4</td><td><span class="badge badge-fwd">Block 2</span></td><td>Conv2d(64&rarr;64, 3&times;3, pad=1)</td><td class="num">(64,7,20)</td><td class="num">36,928</td><td class="num">5.161</td><td class="num">516.10</td><td class="num">32.9%</td></tr>
+<tr><td></td><td></td><td style="color:var(--text2)">BN + ReLU + MaxPool2d(2) + Drop</td><td class="num">(64,3,10)</td><td class="num">128</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num"></td></tr>
+<tr><td>5</td><td><span class="badge badge-core">Block 3</span></td><td>Conv2d(64&rarr;128, 3&times;3, pad=1)</td><td class="num">(128,3,10)</td><td class="num">73,856</td><td class="num">2.212</td><td class="num">221.18</td><td class="num">14.1%</td></tr>
+<tr><td></td><td></td><td style="color:var(--text2)">BN + ReLU + AvgPool(1,1)</td><td class="num">(128,1,1)</td><td class="num">256</td><td class="num">&mdash;</td><td class="num">&mdash;</td><td class="num"></td></tr>
+<tr style="border-top: 2px dashed var(--border);"><td>6</td><td><span class="badge badge-cls">FC</span></td><td>Linear(128&rarr;128) + BN + ReLU</td><td class="num">(128)</td><td class="num">16,768</td><td class="num">0.016</td><td class="num">1.64</td><td class="num">0.1%</td></tr>
+<tr><td>7</td><td><span class="badge badge-cls">FC</span></td><td>Linear(128&rarr;3)</td><td class="num">(3)</td><td class="num">387</td><td class="num">0.000</td><td class="num">0.04</td><td class="num">0.0%</td></tr>
+<tr style="font-weight:700; border-top:2px solid var(--primary);"><td></td><td></td><td><strong>Total</strong></td><td></td><td class="num"><strong>156,643</strong></td><td class="num"><strong>15.672</strong></td><td class="num"><strong>1,567.24</strong></td><td class="num"><strong>100%</strong></td></tr>
+</tbody>
+</table>
+
+<div class="info-box v1" style="margin-top:1rem;">
+    <strong>V1 bottleneck:</strong> The two Conv2d layers in Block&nbsp;1 and Block&nbsp;2 together account for
+    <strong>85.8%</strong> of all computation (1,344 of 1,567 MMAC/s).
+    These are standard 2D convolutions with full channel mixing &mdash; the most expensive operation type.
+    Furthermore, V1 processes each frame <em>independently</em>, so computation cannot be shared across frames.
+</div>
+</div>
+
+<!-- V1 by section -->
+<div class="card">
+<h3>V1 — Complexity by Section</h3>
+<table>
+<tr><th style="width:25%">Section</th><th class="num">Layers</th><th class="num">Params</th><th class="num">MMACs/frame</th><th class="num">MMAC/s</th><th class="num">% of Total</th></tr>
+<tr><td><span class="badge badge-fwd">Conv Block 1</span> (32 ch)</td><td class="num">2 conv</td><td class="num">9,696</td><td class="num">5.702</td><td class="num">570.24</td><td class="num">36.4%</td></tr>
+<tr><td><span class="badge badge-fwd">Conv Block 2</span> (64 ch)</td><td class="num">2 conv</td><td class="num">55,680</td><td class="num">7.741</td><td class="num">774.14</td><td class="num">49.4%</td></tr>
+<tr><td><span class="badge badge-core">Conv Block 3</span> (128 ch)</td><td class="num">1 conv</td><td class="num">74,112</td><td class="num">2.212</td><td class="num">221.18</td><td class="num">14.1%</td></tr>
+<tr><td><span class="badge badge-cls">Classifier</span></td><td class="num">2 FC</td><td class="num">17,155</td><td class="num">0.017</td><td class="num">1.68</td><td class="num">0.1%</td></tr>
+<tr style="font-weight:700; border-top:2px solid var(--primary);"><td><strong>Total</strong></td><td class="num"><strong>7</strong></td><td class="num"><strong>156,643</strong></td><td class="num"><strong>15.672</strong></td><td class="num"><strong>1,567.24</strong></td><td class="num"><strong>100%</strong></td></tr>
+</table>
+</div>
+
+<!-- ════════════════════ 3. V2 BLOCK DIAGRAM ════════════════════ -->
+<h2>3. V2 — Block Diagram &amp; Complexity</h2>
+<div class="card">
+<h3>MVAD_V2 Architecture (sequence-to-sequence processing)</h3>
+
+<div class="arch-diagram">
+    <div class="layer">
+        <div class="layer-box input">Input &mdash; Mel Features (40 &times; T) @ 100 Hz</div>
+        <div class="layer-details">40 mel bands, T frames (e.g. 1,500 frames for 15 s file), 10 ms hop</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="section-divider"><span class="badge badge-fwd">Input Projection</span></div>
+
+    <div class="layer">
+        <div class="layer-box v2-input">Conv1d(40&rarr;64, k=1) + BN + ReLU</div>
+        <div class="layer-details">Pointwise projection: mel bands &rarr; 64 hidden channels &mdash; 2,688 params, 2,560 MACs/frame</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="section-divider"><span class="badge badge-v2">Temporal Processing</span> &mdash; Depthwise-Separable 1D Conv Blocks</div>
+
+    <div class="layer">
+        <div class="layer-box v2-ds">DS Block 1: DW-Conv1d(64, k=15) + PW-Conv1d(64&rarr;64)</div>
+        <div class="layer-details">Depthwise (k=15, center) + Pointwise + BN + ReLU &mdash; 5,312 params, 5,056 MACs/frame</div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="layer">
+        <div class="layer-box v2-ds-res">DS Block 2: DW-Conv1d(64, k=15) + PW-Conv1d(64&rarr;64) + Residual</div>
+        <div class="layer-details">Same + residual skip connection &mdash; 5,312 params, 5,056 MACs/frame</div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="layer">
+        <div class="layer-box v2-ds-res">DS Block 3: DW-Conv1d(64, k=15) + PW-Conv1d(64&rarr;64) + Residual</div>
+        <div class="layer-details">Same + residual skip connection &mdash; 5,312 params, 5,056 MACs/frame</div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="layer">
+        <div class="layer-box v2-ds-res">DS Block 4: DW-Conv1d(64, k=15) + PW-Conv1d(64&rarr;64) + Residual</div>
+        <div class="layer-details">Same + residual skip connection &mdash; 5,312 params, 5,056 MACs/frame</div>
+    </div>
+    <div class="arrow">&darr;</div>
+    <div class="layer">
+        <div class="layer-box v2-ds-last">DS Block 5: DW-Conv1d(64, k=15) + PW-Conv1d(64&rarr;32)</div>
+        <div class="layer-details">Channel reduction 64 &rarr; 32 &mdash; 3,200 params, 3,008 MACs/frame</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="section-divider"><span class="badge badge-cls">Classification Head</span></div>
+
+    <div class="layer">
+        <div class="layer-box v2-output">Conv1d(32&rarr;3, k=1)</div>
+        <div class="layer-details">Per-frame classification &mdash; 99 params, 96 MACs/frame</div>
+    </div>
+    <div class="arrow">&darr;</div>
+
+    <div class="layer">
+        <div class="layer-box output">Output &mdash; 3 classes &times; T frames @ 100 Hz</div>
+        <div class="layer-details">Sequence-to-sequence: one classification per 10 ms frame, all frames at once</div>
+    </div>
+</div>
+
+<div class="info-box v2">
+    <strong>Depthwise-Separable factorization:</strong> Each DS block decomposes a standard Conv1d into
+    a <strong>depthwise</strong> conv (per-channel temporal filtering, k=15) followed by a <strong>pointwise</strong> conv
+    (cross-channel mixing, k=1). For C=64 and K=15, this reduces MACs from 64&times;64&times;15 = 61,440
+    to 64&times;15 + 64&times;64 = 5,056 per frame &mdash; a <strong>12.2&times; saving</strong> per block.
+</div>
+
+<div class="info-box v2" style="margin-top:.5rem;">
+    <strong>Streaming design:</strong> Center-aligned padding (pad = K//2 = 7 on each side) means each layer
+    requires <strong>7 future frames</strong> (70 ms). With 5 DS blocks stacked, the total lookahead is
+    5 &times; 7 = <strong>35 frames = 350 ms</strong>, well within the 1&thinsp;s latency budget.
+    In streaming mode, buffer 35 frames before producing output.
+</div>
+</div>
+
+<!-- V2 Complexity Table -->
+<div class="card">
+<h3>V2 — Per-Layer Computational Complexity</h3>
+<p style="margin-bottom:.8rem;">MACs per frame at 100 Hz output rate (10 ms hop).
+Unlike V1, the model processes all T frames in a single forward pass,
+sharing computation along the time axis.</p>
+
+<table>
+<thead>
+<tr><th>#</th><th>Layer</th><th class="num">Channels</th><th class="num">Kernel</th><th class="num">Res</th><th class="num">Params</th><th class="num">MACs/fr</th><th class="num">MMAC/s</th><th class="num">%</th></tr>
+</thead>
+<tbody>
+<tr class="highlight-v2"><td>1</td><td>Input: Conv1d(40&rarr;64, k=1) + BN + ReLU</td><td class="num">40&rarr;64</td><td class="num">1</td><td class="num">&mdash;</td><td class="num">2,688</td><td class="num">2,560</td><td class="num">0.256</td><td class="num">9.9%</td></tr>
+<tr><td>2</td><td>DS Block 1: DW(64,k=15) + PW(64&rarr;64)</td><td class="num">64&rarr;64</td><td class="num">15</td><td class="num">&mdash;</td><td class="num">5,312</td><td class="num">5,056</td><td class="num">0.506</td><td class="num">19.5%</td></tr>
+<tr><td>3</td><td>DS Block 2: DW(64,k=15) + PW(64&rarr;64) + Res</td><td class="num">64&rarr;64</td><td class="num">15</td><td class="num">&check;</td><td class="num">5,312</td><td class="num">5,056</td><td class="num">0.506</td><td class="num">19.5%</td></tr>
+<tr><td>4</td><td>DS Block 3: DW(64,k=15) + PW(64&rarr;64) + Res</td><td class="num">64&rarr;64</td><td class="num">15</td><td class="num">&check;</td><td class="num">5,312</td><td class="num">5,056</td><td class="num">0.506</td><td class="num">19.5%</td></tr>
+<tr><td>5</td><td>DS Block 4: DW(64,k=15) + PW(64&rarr;64) + Res</td><td class="num">64&rarr;64</td><td class="num">15</td><td class="num">&check;</td><td class="num">5,312</td><td class="num">5,056</td><td class="num">0.506</td><td class="num">19.5%</td></tr>
+<tr><td>6</td><td>DS Block 5: DW(64,k=15) + PW(64&rarr;32)</td><td class="num">64&rarr;32</td><td class="num">15</td><td class="num">&mdash;</td><td class="num">3,200</td><td class="num">3,008</td><td class="num">0.301</td><td class="num">11.6%</td></tr>
+<tr style="border-top: 2px dashed var(--border);"><td>7</td><td>Output: Conv1d(32&rarr;3, k=1)</td><td class="num">32&rarr;3</td><td class="num">1</td><td class="num">&mdash;</td><td class="num">99</td><td class="num">96</td><td class="num">0.010</td><td class="num">0.4%</td></tr>
+<tr style="font-weight:700; border-top:2px solid var(--primary);"><td></td><td><strong>Total</strong></td><td></td><td></td><td></td><td class="num"><strong>27,235</strong></td><td class="num"><strong>25,888</strong></td><td class="num"><strong>2.589</strong></td><td class="num"><strong>100%</strong></td></tr>
+</tbody>
+</table>
+
+<div class="info-box v2" style="margin-top:1rem;">
+    <strong>Compute distribution:</strong> The 5 DS blocks account for <strong>89.6%</strong> of all computation
+    (23,232 / 25,888 MACs per frame). Within each block, the pointwise convolution dominates
+    (64&times;64 = 4,096 MACs vs 64&times;15 = 960 MACs for the depthwise part).
+    The 3 residual blocks (2&ndash;4) aid gradient flow without adding any extra parameters or compute.
+</div>
+</div>
+
+<!-- V2 by section -->
+<div class="card">
+<h3>V2 — Complexity by Section</h3>
+<table>
+<tr><th style="width:30%">Section</th><th class="num"># Layers</th><th class="num">Params</th><th class="num">MACs/frame</th><th class="num">MMAC/s</th><th class="num">% of Total</th></tr>
+<tr><td><span class="badge badge-fwd">Input Projection</span></td><td class="num">1</td><td class="num">2,688</td><td class="num">2,560</td><td class="num">0.256</td><td class="num">9.9%</td></tr>
+<tr><td><span class="badge badge-v2">DS Blocks 1&ndash;4</span> (64 ch)</td><td class="num">4</td><td class="num">21,248</td><td class="num">20,224</td><td class="num">2.022</td><td class="num">78.1%</td></tr>
+<tr><td><span class="badge badge-inv">DS Block 5</span> (64&rarr;32)</td><td class="num">1</td><td class="num">3,200</td><td class="num">3,008</td><td class="num">0.301</td><td class="num">11.6%</td></tr>
+<tr><td><span class="badge badge-cls">Output Head</span></td><td class="num">1</td><td class="num">99</td><td class="num">96</td><td class="num">0.010</td><td class="num">0.4%</td></tr>
+<tr style="font-weight:700; border-top:2px solid var(--primary);"><td><strong>Total</strong></td><td class="num"><strong>7</strong></td><td class="num"><strong>27,235</strong></td><td class="num"><strong>25,888</strong></td><td class="num"><strong>2.589</strong></td><td class="num"><strong>100%</strong></td></tr>
+</table>
+</div>
+
+<!-- ════════════════════ 4. COMPARISON TABLE ════════════════════ -->
+<h2>4. Detailed Comparison</h2>
+<div class="card">
+<table>
+<tr><th style="width:30%">Property</th><th style="width:35%"><span class="badge badge-v1">V1</span> MultivoiceVAD_CNN</th><th style="width:35%"><span class="badge badge-v2">V2</span> MVAD_V2</th></tr>
+<tr><td><strong>Input representation</strong></td><td>Mel patch (15 &times; 40) per frame</td><td>Mel sequence (40 &times; T) &mdash; full file/chunk</td></tr>
+<tr><td><strong>Processing mode</strong></td><td>Frame-by-frame (independent)</td><td><strong>Sequence-to-sequence</strong> (shared computation)</td></tr>
+<tr><td><strong>Conv type</strong></td><td>Standard Conv2d</td><td><strong>Depthwise-Separable Conv1d</strong></td></tr>
+<tr><td><strong>Computational cost</strong></td><td class="num">1,567.24 MMAC/s</td><td class="num"><strong>2.59 MMAC/s</strong> (605&times; less)</td></tr>
+<tr><td><strong>Parameters</strong></td><td class="num">156,643</td><td class="num"><strong>27,235</strong> (5.7&times; less)</td></tr>
+<tr><td><strong>Memory (16-bit)</strong></td><td class="num">&asymp; 306 KB</td><td class="num"><strong>&asymp; 53 KB</strong></td></tr>
+<tr><td><strong>Max channels</strong></td><td class="num">128</td><td class="num">64</td></tr>
+<tr><td><strong>Receptive field</strong></td><td class="num">150 ms (15 frames)</td><td class="num"><strong>710 ms</strong> (71 frames)</td></tr>
+<tr><td><strong>Lookahead (latency)</strong></td><td class="num">70 ms (7 frames)</td><td class="num"><strong>350 ms</strong> (35 frames)</td></tr>
+<tr><td><strong>Lookahead budget used</strong></td><td class="num">70 ms / 1,000 ms = 7%</td><td class="num"><strong>350 ms / 1,000 ms = 35%</strong></td></tr>
+<tr><td><strong>Output rate</strong></td><td class="num">100 Hz</td><td class="num">100 Hz (same)</td></tr>
+<tr><td><strong>Mel features</strong></td><td>40 bands, 25 ms / 10 ms</td><td>40 bands, 25 ms / 10 ms (same)</td></tr>
+<tr><td><strong>Residual connections</strong></td><td>None</td><td><strong>3 blocks</strong> (DS Blocks 2&ndash;4)</td></tr>
+<tr><td><strong>Streaming-friendly</strong></td><td>Yes (per-frame)</td><td><strong>Yes</strong> (chunk-based, 350 ms buffer)</td></tr>
+<tr><td><strong>Dropout</strong></td><td>Dropout2d(0.1) + Dropout(0.3)</td><td>Dropout(0.1) per block</td></tr>
+<tr><td><strong>Training approach</strong></td><td>Context-window per frame</td><td><strong>5 s chunks, seq-to-seq</strong></td></tr>
+</table>
+
+<div class="info-box good" style="margin-top:1rem;">
+    <strong>Summary:</strong> V2 achieves a <strong>605&times; reduction in MMAC/s</strong> and <strong>5.7&times; fewer parameters</strong>
+    through two key innovations: (1)&nbsp;replacing 2D convolutions with depthwise-separable 1D convolutions
+    (~12&times; savings per layer), and (2)&nbsp;switching from per-frame processing to sequence processing
+    (amortizing computation across all T frames). The 350&thinsp;ms lookahead uses only 35% of the available
+    1&thinsp;s latency budget while providing a <strong>4.7&times; wider temporal context</strong> than V1.
+</div>
+</div>
+
+<!-- ════════════════════ 5. STREAMING & LATENCY ════════════════════ -->
+<h2>5. Streaming &amp; Latency Analysis</h2>
+<div class="card">
+<h3>V2 Lookahead Budget Breakdown</h3>
+
+<table>
+<tr><th>Layer</th><th class="num">Kernel Size</th><th class="num">Padding (each side)</th><th class="num">Lookahead (frames)</th><th class="num">Lookahead (ms)</th></tr>
+<tr><td>Input Conv1d (k=1)</td><td class="num">1</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td>DS Block 1 (k=15)</td><td class="num">15</td><td class="num">7</td><td class="num">7</td><td class="num">70</td></tr>
+<tr><td>DS Block 2 (k=15)</td><td class="num">15</td><td class="num">7</td><td class="num">7</td><td class="num">70</td></tr>
+<tr><td>DS Block 3 (k=15)</td><td class="num">15</td><td class="num">7</td><td class="num">7</td><td class="num">70</td></tr>
+<tr><td>DS Block 4 (k=15)</td><td class="num">15</td><td class="num">7</td><td class="num">7</td><td class="num">70</td></tr>
+<tr><td>DS Block 5 (k=15)</td><td class="num">15</td><td class="num">7</td><td class="num">7</td><td class="num">70</td></tr>
+<tr><td>Output Conv1d (k=1)</td><td class="num">1</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+<tr style="font-weight:700; border-top:2px solid var(--primary);"><td><strong>Total</strong></td><td></td><td></td><td class="num"><strong>35</strong></td><td class="num"><strong>350</strong></td></tr>
+</table>
+
+<div class="grid3" style="margin-top:1.2rem;">
+    <div class="card kpi good"><div class="value">350 ms</div><div class="label">Total Lookahead</div><div class="sub">35 frames @ 100 Hz</div></div>
+    <div class="card kpi"><div class="value">710 ms</div><div class="label">Receptive Field</div><div class="sub">71 frames total context</div></div>
+    <div class="card kpi good"><div class="value">35%</div><div class="label">Budget Used</div><div class="sub">350 ms / 1,000 ms max</div></div>
+</div>
+
+<div class="info-box" style="margin-top:1rem;">
+    <strong>Streaming protocol:</strong> To produce the output at time <em>t</em>, the model needs input up to
+    time <em>t</em>&thinsp;+&thinsp;350&thinsp;ms. In practice, buffer 35 frames of &ldquo;future&rdquo; audio before emitting each
+    output frame. The total <strong>end-to-end latency</strong> (mel extraction + buffering + inference) is
+    approximately <strong>350 ms + computation time</strong>. With 2.59 MMAC/s of compute, inference on a
+    modern CPU is near-instantaneous.
+</div>
+</div>
+
+<!-- ════════════════════ 6. DESIGN RATIONALE ════════════════════ -->
+<h2>6. Design Rationale</h2>
+<div class="card">
+
+<h3>Why Depthwise-Separable 1D Convolutions?</h3>
+<p>
+    Standard 2D convolutions (V1) treat the mel spectrogram as an image and mix across both
+    frequency and time dimensions simultaneously. While powerful, this is computationally expensive:
+    a Conv2d(C<sub>in</sub>, C<sub>out</sub>, k&times;k) costs C<sub>in</sub>&times;C<sub>out</sub>&times;k<sup>2</sup>&times;H&times;W MACs.
+</p>
+<p style="margin-top:.7rem;">
+    V2 separates the problem into two steps:
+</p>
+<ol style="padding-left:1.5rem; margin-top:.5rem;">
+    <li><strong>Frequency mixing</strong> via pointwise Conv1d (k=1): maps 40 mel bands to 64 features.
+        This is analogous to learned frequency weighting.</li>
+    <li><strong>Temporal modelling</strong> via depthwise Conv1d (k=15): each channel is filtered independently
+        along time, capturing local temporal dynamics.</li>
+</ol>
+<p style="margin-top:.7rem;">
+    This factorization reduces per-layer MACs by <strong>~12&times;</strong> while preserving the ability to model
+    both spectral and temporal patterns. The 5 stacked blocks provide a 710&thinsp;ms receptive field,
+    far exceeding V1&rsquo;s 150&thinsp;ms context.
+</p>
+
+<h3 style="margin-top:1.5rem;">Latency vs Accuracy Trade-off</h3>
+<p>
+    The 1&thinsp;s latency budget allows up to 100 frames of lookahead at 100&thinsp;Hz.
+    V2 uses <strong>35 frames (350 ms)</strong> &mdash; a deliberate choice balancing:
+</p>
+<ul style="padding-left:1.5rem; margin-top:.5rem;">
+    <li><strong>More temporal context</strong> for overlap detection (the hardest class)</li>
+    <li><strong>Margin for future expansion</strong> (e.g., adding 1&ndash;2 more blocks within budget)</li>
+    <li><strong>Practical streaming</strong> (350&thinsp;ms buffer is acceptable for most applications)</li>
+</ul>
+
+<h3 style="margin-top:1.5rem;">Comparison with Raw-Audio Models</h3>
+<table style="margin-top:.5rem;">
+<tr><th>Model</th><th class="num">MMAC/s</th><th class="num">Params</th><th class="num">Input</th><th class="num">Output Rate</th></tr>
+<tr><td>VAD_I_C2_L8</td><td class="num">2.03</td><td class="num">6,176</td><td class="num">Raw 16 kHz</td><td class="num">125 Hz</td></tr>
+<tr style="background: var(--v2-light);"><td><strong>MVAD_V2</strong></td><td class="num"><strong>2.59</strong></td><td class="num"><strong>27,235</strong></td><td class="num"><strong>Mel 100 Hz</strong></td><td class="num"><strong>100 Hz</strong></td></tr>
+<tr><td>VAD_H_C24_L10</td><td class="num">23.27</td><td class="num">77,960</td><td class="num">Raw 16 kHz</td><td class="num">250 Hz</td></tr>
+<tr style="background: var(--v1-light);"><td>V1 CNN (mel)</td><td class="num">1,567.24</td><td class="num">156,643</td><td class="num">Mel 100 Hz</td><td class="num">100 Hz</td></tr>
+</table>
+<div class="info-box" style="margin-top:1rem;">
+    <strong>V2 vs raw-audio models:</strong> MVAD_V2 sits in a similar computational budget as VAD_I (~2.6 vs ~2.0 MMAC/s)
+    but benefits from <strong>mel-filterbank features</strong>, which provide a richer per-frame representation than
+    raw audio samples. The mel features perform implicit frequency analysis, potentially allowing the model
+    to achieve better results with fewer parameters and lower temporal resolution.
+</div>
+</div>
+
+<footer>
+    MVAD Network Architectures &mdash; V1 vs V2 Comparison<br>
+    Generated from <code>train_mvad_dnn.py</code> (V1) and <code>train_mvad_dnn_v2.py</code> (V2)
+</footer>
+
+</div><!-- .container -->
+</body>
+</html>

@@ -135,17 +135,17 @@ footer { text-align: center; margin-top: 3rem; color: var(--text2); font-size: .
 <div class="container">
 
 <!-- ════════════════════ HEADER ════════════════════ -->
-<h1>Multi-Voice Activity Detection <br><small>Comparison: Traditional Signal Processing vs Deep Neural Network (CNN)</small></h1>
+<h1>Multi-Voice Activity Detection <br><small>Comparison: Traditional Signal Processing vs Deep Neural Network (MVAD_V2 &mdash; DS-Conv1D)</small></h1>
 
 <div class="grid4" style="margin-top:1.2rem;">
-    <div class="card kpi"><div class="value">3</div><div class="label">Output Classes</div><div class="sub">silence · single · overlap</div></div>
+    <div class="card kpi"><div class="value">3</div><div class="label">Output Classes</div><div class="sub">silence &middot; single &middot; overlap</div></div>
     <div class="card kpi"><div class="value">100</div><div class="label">Test Files</div><div class="sub">~15 s each @ 48 kHz</div></div>
-    <div class="card kpi"><div class="value">149,800</div><div class="label">Total Frames</div><div class="sub">10 ms per frame</div></div>
-    <div class="card kpi"><div class="value">2</div><div class="label">Methods Compared</div><div class="sub"><span class="badge badge-trad">Traditional</span> <span class="badge badge-dnn">DNN</span></div></div>
+    <div class="card kpi"><div class="value">150,100</div><div class="label">Total Frames</div><div class="sub">10 ms per frame</div></div>
+    <div class="card kpi"><div class="value">2</div><div class="label">Methods Compared</div><div class="sub"><span class="badge badge-trad">Traditional</span> <span class="badge badge-dnn">DNN V2</span></div></div>
 </div>
 
 <!-- ════════════════════ 1. PROBLEM ════════════════════ -->
-<h2>1. Problem — Multi-Voice Activity Detection</h2>
+<h2>1. Problem &mdash; Multi-Voice Activity Detection</h2>
 <div class="card">
 <p>The goal of the system is to classify each audio frame (10&thinsp;ms) into one of three classes:</p>
 
@@ -164,17 +164,17 @@ footer { text-align: center; margin-top: 3rem; color: var(--text2); font-size: .
 </div>
 
 <!-- ════════════════════ 2. TRADITIONAL METHOD ════════════════════ -->
-<h2>2. Method 1 — Traditional (Signal Processing)</h2>
+<h2>2. Method 1 &mdash; Traditional (Signal Processing)</h2>
 <div class="card">
 <p><span class="badge badge-trad">SIGNAL PROCESSING</span></p>
 <p style="margin-top:.7rem;">
     The traditional method is entirely based on <strong>hand-crafted acoustic features</strong>
-    and <strong>heuristic rules</strong>. It does not require any machine learning — instead, it leverages
+    and <strong>heuristic rules</strong>. It does not require any machine learning &mdash; instead, it leverages
     domain knowledge about speech signal properties to distinguish silence from single-speaker speech
     and overlapping speech from multiple speakers.
 </p>
 <p style="margin-top:.7rem;">
-    Key idea: <strong>overlapping speech</strong> causes characteristic changes in the signal —
+    Key idea: <strong>overlapping speech</strong> causes characteristic changes in the signal &mdash;
     decreased harmonicity (HNR), wider bandwidth, increased sub-band entropy, F0 instability,
     and the emergence of a second fundamental frequency. The algorithm combines multiple such
     indicators into a single <em>overlap score</em>, which is then compared against a threshold.
@@ -218,19 +218,21 @@ footer { text-align: center; margin-top: 3rem; color: var(--text2); font-size: .
 </div>
 
 <!-- ════════════════════ 3. DNN METHOD ════════════════════ -->
-<h2>3. Method 2 — Deep Neural Network (DNN)</h2>
+<h2>3. Method 2 &mdash; Deep Neural Network (MVAD_V2 &mdash; DS-Conv1D)</h2>
 <div class="card">
-<p><span class="badge badge-dnn">DEEP LEARNING / CNN</span></p>
+<p><span class="badge badge-dnn">DEEP LEARNING / DS-CNN-1D</span></p>
 <p style="margin-top:.7rem;">
-    The DNN method uses a <strong>convolutional neural network (CNN)</strong> trained
-    on <strong>log mel-filterbank energies</strong> (40 mel bands). The network treats
-    a context window (15 frames = 150 ms) as a small &ldquo;image&rdquo; of dimensions 15 &times; 40
-    and classifies the central frame into one of the 3 classes.
+    The DNN method uses a <strong>lightweight 1D depthwise-separable convolutional neural network (DS-Conv1D)</strong>
+    trained on <strong>log mel-filterbank energies</strong> (40 mel bands). Unlike the previous V1 CNN that treated
+    each context window as an independent 2D &ldquo;image&rdquo;, the MVAD_V2 model processes the entire temporal
+    sequence at once using 1D convolutions along the time axis &mdash; producing a per-frame classification
+    at each time step in a single forward pass.
 </p>
 <p style="margin-top:.7rem;">
-    Unlike the traditional method, the network <strong>learns by itself</strong> which features are important
-    for distinguishing silence, speech, and overlap &mdash; no manual rule definition is required.
-    The model is trained with supervision on synthetic data with precise per-sample labels.
+    The architecture uses <strong>depthwise-separable convolutions</strong> to drastically reduce computational
+    complexity while maintaining a wide receptive field (710&thinsp;ms). This factorization separates
+    spatial/temporal processing (depthwise) from channel mixing (pointwise), achieving &sim;12&times; fewer
+    MACs per layer compared to standard convolutions with the same kernel size and channel count.
 </p>
 </div>
 
@@ -240,68 +242,62 @@ footer { text-align: center; margin-top: 3rem; color: var(--text2); font-size: .
     <div class="pipeline-step"><div class="pipeline-num dnn-num">1</div><div class="pipeline-text"><strong>STFT:</strong> Short-Time Fourier Transform (Hann window 25 ms, hop 10 ms, N_FFT = 2048) &rarr; power spectrogram.</div></div>
     <div class="pipeline-step"><div class="pipeline-num dnn-num">2</div><div class="pipeline-text"><strong>Mel-Filterbank:</strong> Triangular bank of 40 mel filters (80&ndash;8000 Hz) &rarr; logarithmic energy in mel bands &rarr; matrix (n_frames &times; 40).</div></div>
     <div class="pipeline-step"><div class="pipeline-num dnn-num">3</div><div class="pipeline-text"><strong>Z-score normalization:</strong> Feature standardization based on training set statistics (&mu;, &sigma; computed offline).</div></div>
-    <div class="pipeline-step"><div class="pipeline-num dnn-num">4</div><div class="pipeline-text"><strong>Context window:</strong> For each frame, &plusmn;7 neighboring frames are gathered &rarr; patch of 15 &times; 40 (150 ms of context).</div></div>
-    <div class="pipeline-step"><div class="pipeline-num dnn-num">5</div><div class="pipeline-text"><strong>CNN forward pass:</strong> Patch as a 1-channel image &rarr; 3 convolutional blocks &rarr; AdaptiveAvgPool &rarr; FC &rarr; 3-class logits.</div></div>
-    <div class="pipeline-step"><div class="pipeline-num dnn-num">6</div><div class="pipeline-text"><strong>Argmax:</strong> Class with the highest logit &rarr; prediction (0/1/2).</div></div>
+    <div class="pipeline-step"><div class="pipeline-num dnn-num">4</div><div class="pipeline-text"><strong>Input projection:</strong> Pointwise Conv1d (40&rarr;64 channels) maps mel bands to the hidden dimension.</div></div>
+    <div class="pipeline-step"><div class="pipeline-num dnn-num">5</div><div class="pipeline-text"><strong>5&times; DS-Conv blocks:</strong> Each block applies DW-Conv1d(k=15) &rarr; BN &rarr; ReLU &rarr; PW-Conv1d &rarr; BN &rarr; ReLU. Blocks 2&ndash;4 have residual connections. The last block reduces channels from 64&rarr;32.</div></div>
+    <div class="pipeline-step"><div class="pipeline-num dnn-num">6</div><div class="pipeline-text"><strong>Output head:</strong> Pointwise Conv1d (32&rarr;3) &rarr; per-frame 3-class logits &rarr; argmax &rarr; prediction.</div></div>
 </div>
 </div>
 
 <!-- Architecture Block Diagram -->
 <div class="card">
-<h3>Model Architecture (CNN) &mdash; Block Diagram</h3>
+<h3>Model Architecture (MVAD_V2 &mdash; DS-Conv1D) &mdash; Block Diagram</h3>
 
 <div class="arch-diagram">
     <div class="layer">
-        <div class="layer-box input">Input &mdash; Log Mel Patch (1 &times; 15 &times; 40)</div>
-        <div class="layer-details">1-channel &ldquo;image&rdquo;: 15 context frames &times; 40 mel bands</div>
+        <div class="layer-box input">Input &mdash; Log Mel Features (40 bands &times; T frames)</div>
+        <div class="layer-details">40 mel bands at 100 Hz (10 ms hop), full temporal sequence</div>
     </div>
     <div class="arrow">&darr;</div>
 
     <div class="layer">
-        <div class="layer-box hidden">Block 1: Conv2d(1&rarr;32, 3&times;3) &rarr; BN &rarr; ReLU &rarr; Conv2d(32&rarr;32, 3&times;3) &rarr; BN &rarr; ReLU</div>
-        <div class="layer-details">Output: (B, 32, 15, 40)</div>
+        <div class="layer-box hidden">Input Projection: Conv1d(40&rarr;64, k=1) &rarr; BN &rarr; ReLU</div>
+        <div class="layer-details">Output: (B, 64, T) &mdash; 2,560 MACs/frame</div>
     </div>
     <div class="arrow">&darr;</div>
 
     <div class="layer">
-        <div class="layer-box pool">MaxPool2d(2&times;2) + Dropout2d(0.1)</div>
-        <div class="layer-details">Output: (B, 32, 7, 20)</div>
+        <div class="layer-box hidden">DS Block 1: DW-Conv1d(64, k=15) &rarr; BN &rarr; ReLU &rarr; PW-Conv1d(64&rarr;64) &rarr; BN &rarr; ReLU</div>
+        <div class="layer-details">Output: (B, 64, T) &mdash; 5,056 MACs/frame</div>
     </div>
     <div class="arrow">&darr;</div>
 
     <div class="layer">
-        <div class="layer-box hidden">Block 2: Conv2d(32&rarr;64, 3&times;3) &rarr; BN &rarr; ReLU &rarr; Conv2d(64&rarr;64, 3&times;3) &rarr; BN &rarr; ReLU</div>
-        <div class="layer-details">Output: (B, 64, 7, 20)</div>
+        <div class="layer-box hidden" style="border-style: double;">DS Block 2: DW-Conv1d(64, k=15) + PW-Conv1d(64&rarr;64) + Residual</div>
+        <div class="layer-details">Output: (B, 64, T) &mdash; 5,056 MACs/frame &middot; skip connection</div>
     </div>
     <div class="arrow">&darr;</div>
 
     <div class="layer">
-        <div class="layer-box pool">MaxPool2d(2&times;2) + Dropout2d(0.1)</div>
-        <div class="layer-details">Output: (B, 64, 3, 10)</div>
+        <div class="layer-box hidden" style="border-style: double;">DS Block 3: DW-Conv1d(64, k=15) + PW-Conv1d(64&rarr;64) + Residual</div>
+        <div class="layer-details">Output: (B, 64, T) &mdash; 5,056 MACs/frame &middot; skip connection</div>
     </div>
     <div class="arrow">&darr;</div>
 
     <div class="layer">
-        <div class="layer-box hidden">Block 3: Conv2d(64&rarr;128, 3&times;3) &rarr; BN &rarr; ReLU</div>
-        <div class="layer-details">Output: (B, 128, 3, 10)</div>
+        <div class="layer-box hidden" style="border-style: double;">DS Block 4: DW-Conv1d(64, k=15) + PW-Conv1d(64&rarr;64) + Residual</div>
+        <div class="layer-details">Output: (B, 64, T) &mdash; 5,056 MACs/frame &middot; skip connection</div>
     </div>
     <div class="arrow">&darr;</div>
 
     <div class="layer">
-        <div class="layer-box pool">AdaptiveAvgPool2d(1&times;1)</div>
-        <div class="layer-details">Output: (B, 128, 1, 1)</div>
+        <div class="layer-box hidden">DS Block 5: DW-Conv1d(64, k=15) + PW-Conv1d(64&rarr;32)</div>
+        <div class="layer-details">Output: (B, 32, T) &mdash; 3,008 MACs/frame &middot; channel reduction</div>
     </div>
     <div class="arrow">&darr;</div>
 
     <div class="layer">
-        <div class="layer-box hidden">Classifier: Flatten &rarr; FC(128&rarr;128) &rarr; BN &rarr; ReLU &rarr; Dropout(0.3) &rarr; FC(128&rarr;3)</div>
-        <div class="layer-details">Output: (B, 3) logits</div>
-    </div>
-    <div class="arrow">&darr;</div>
-
-    <div class="layer">
-        <div class="layer-box output">Output &mdash; argmax &rarr; {silence, single, overlap}</div>
-        <div class="layer-details">3-class prediction per frame (argmax over raw logits)</div>
+        <div class="layer-box output">Output Head: Conv1d(32&rarr;3, k=1) &rarr; argmax &rarr; {silence, single, overlap}</div>
+        <div class="layer-details">Output: (B, 3, T) &mdash; 96 MACs/frame &middot; 3-class prediction per frame</div>
     </div>
 </div>
 </div>
@@ -314,52 +310,39 @@ One MAC equals one multiplication plus one addition (2 FLOPs).
 The model processes one frame every 10&thinsp;ms at 100&thinsp;frames/s.</p>
 
 <div class="grid4" style="margin-top:1rem;">
-    <div class="card kpi"><div class="value">15.67</div><div class="label">MMACs / frame</div></div>
-    <div class="card kpi"><div class="value">1,567</div><div class="label">MMACs/s @100 fps</div></div>
-    <div class="card kpi good"><div class="value">156,643</div><div class="label">Parameters</div><div class="sub">&asymp; 0.61 MB (FP32)</div></div>
-    <div class="card kpi warn"><div class="value">68.2%</div><div class="label">Dominant Layers</div><div class="sub">Conv2d #2 + Conv2d #4</div></div>
+    <div class="card kpi good"><div class="value">0.026</div><div class="label">MMACs / frame</div></div>
+    <div class="card kpi good"><div class="value">2.59</div><div class="label">MMACs/s @100 fps</div><div class="sub">&asymp;600&times; lighter than V1</div></div>
+    <div class="card kpi good"><div class="value">27,235</div><div class="label">Parameters</div><div class="sub">&asymp; 0.11 MB (FP32) &middot; 5.7&times; smaller than V1</div></div>
+    <div class="card kpi good"><div class="value">78.1%</div><div class="label">DS Blocks</div><div class="sub">Blocks 1&ndash;5 dominate MACs</div></div>
 </div>
 
 <table style="margin-top:1rem;">
 <tr><th>#</th><th>Layer</th><th class="num">Output Shape</th><th class="num">MACs</th><th class="num">% of Total</th></tr>
-<tr><td>1</td><td><code>Conv2d(1&rarr;32, 3&times;3)</code></td><td class="num">32&times;15&times;40</td><td class="num">172,800</td><td class="num">1.1%</td></tr>
-<tr><td>2</td><td><code>Conv2d(32&rarr;32, 3&times;3)</code></td><td class="num">32&times;15&times;40</td><td class="num">5,529,600</td><td class="num">35.3%</td></tr>
-<tr style="background:#f8fafc;"><td></td><td style="color:var(--text2);">MaxPool2d(2&times;2)</td><td class="num" style="color:var(--text2);">32&times;7&times;20</td><td class="num" style="color:var(--text2);">&mdash;</td><td></td></tr>
-<tr><td>3</td><td><code>Conv2d(32&rarr;64, 3&times;3)</code></td><td class="num">64&times;7&times;20</td><td class="num">2,580,480</td><td class="num">16.5%</td></tr>
-<tr><td>4</td><td><code>Conv2d(64&rarr;64, 3&times;3)</code></td><td class="num">64&times;7&times;20</td><td class="num">5,160,960</td><td class="num">32.9%</td></tr>
-<tr style="background:#f8fafc;"><td></td><td style="color:var(--text2);">MaxPool2d(2&times;2)</td><td class="num" style="color:var(--text2);">64&times;3&times;10</td><td class="num" style="color:var(--text2);">&mdash;</td><td></td></tr>
-<tr><td>5</td><td><code>Conv2d(64&rarr;128, 3&times;3)</code></td><td class="num">128&times;3&times;10</td><td class="num">2,211,840</td><td class="num">14.1%</td></tr>
-<tr style="background:#f8fafc;"><td></td><td style="color:var(--text2);">AdaptiveAvgPool2d(1&times;1)</td><td class="num" style="color:var(--text2);">128&times;1&times;1</td><td class="num" style="color:var(--text2);">&mdash;</td><td></td></tr>
-<tr><td>6</td><td><code>Linear(128&rarr;128)</code></td><td class="num">128</td><td class="num">16,384</td><td class="num">0.1%</td></tr>
-<tr><td>7</td><td><code>Linear(128&rarr;3)</code></td><td class="num">3</td><td class="num">384</td><td class="num">&lt;0.01%</td></tr>
-<tr style="font-weight:700; border-top:2px solid var(--primary);"><td></td><td><strong>Total</strong></td><td></td><td class="num"><strong>15,672,448</strong></td><td class="num"><strong>100%</strong></td></tr>
+<tr><td>1</td><td><code>Conv1d(40&rarr;64, k=1) + BN + ReLU</code></td><td class="num">64 &times; T</td><td class="num">2,560</td><td class="num">9.9%</td></tr>
+<tr><td>2</td><td><code>DS Block 1: DW(64,k=15) + PW(64&rarr;64)</code></td><td class="num">64 &times; T</td><td class="num">5,056</td><td class="num">19.5%</td></tr>
+<tr><td>3</td><td><code>DS Block 2: DW(64,k=15) + PW(64&rarr;64) + Res</code></td><td class="num">64 &times; T</td><td class="num">5,056</td><td class="num">19.5%</td></tr>
+<tr><td>4</td><td><code>DS Block 3: DW(64,k=15) + PW(64&rarr;64) + Res</code></td><td class="num">64 &times; T</td><td class="num">5,056</td><td class="num">19.5%</td></tr>
+<tr><td>5</td><td><code>DS Block 4: DW(64,k=15) + PW(64&rarr;64) + Res</code></td><td class="num">64 &times; T</td><td class="num">5,056</td><td class="num">19.5%</td></tr>
+<tr><td>6</td><td><code>DS Block 5: DW(64,k=15) + PW(64&rarr;32)</code></td><td class="num">32 &times; T</td><td class="num">3,008</td><td class="num">11.6%</td></tr>
+<tr><td>7</td><td><code>Conv1d(32&rarr;3, k=1)</code></td><td class="num">3 &times; T</td><td class="num">96</td><td class="num">0.4%</td></tr>
+<tr style="font-weight:700; border-top:2px solid var(--primary);"><td></td><td><strong>Total</strong></td><td></td><td class="num"><strong>25,888</strong></td><td class="num"><strong>100%</strong></td></tr>
 </table>
 
 <div class="info-box" style="margin-top:1rem;">
     <strong>Note:</strong> MACs count each fused multiply+add as one operation.
-    The cost is dominated by the two 32&rarr;32 and 64&rarr;64 convolution layers (68.2% combined),
-    which operate on the largest spatial feature maps. At 100 frames/s (10 ms hop),
-    the model requires <strong>&asymp;1.57 GMACs/s</strong> &mdash; well within real-time budget even on embedded CPUs.
+    The cost is dominated by the 5 depthwise-separable blocks (89.7% combined).
+    At 100 frames/s (10 ms hop), the model requires only <strong>&asymp;2.59 KMACs/s</strong> &mdash;
+    approximately <strong>600&times; lighter</strong> than the V1 CNN (1,567 MMACs/s),
+    making it highly suitable for embedded and real-time streaming deployment.
 </div>
 
 <div class="info-box" style="margin-top:0.5rem;">
-    <strong>Streaming inference &mdash; potential savings:</strong>
-    The figures above assume a <em>full, independent forward pass</em> per frame (worst-case / upper-bound).
-    In practice, consecutive context windows overlap by 14 out of 15 mel frames (93&thinsp;%).
-    A <strong>streaming (incremental) CNN</strong> implementation could cache intermediate feature maps
-    and recompute only the slice affected by the single new mel frame entering the window.
-    <br><br>
-    <strong>Estimated marginal cost per frame with caching:</strong><br>
-    &bull; <em>Block&nbsp;1</em> (Conv&nbsp;#1 + Conv&nbsp;#2): recompute &asymp;2&ndash;3&thinsp;/&thinsp;15 output rows &rarr; <strong>&asymp;85&thinsp;% savings</strong><br>
-    &bull; <em>Block&nbsp;2</em> (Conv&nbsp;#3 + Conv&nbsp;#4): after MaxPool&thinsp;2&times;2 the shift maps to &asymp;1&thinsp;/&thinsp;7 rows &rarr; <strong>&asymp;70&ndash;80&thinsp;% savings</strong><br>
-    &bull; <em>Block&nbsp;3</em> (Conv&nbsp;#5): feature map is already small (3&times;10) &mdash; moderate savings<br>
-    &bull; <em>AdaptiveAvgPool + FC</em>: can be updated incrementally (old_sum &minus; removed + added)<br>
-    <br>
-    Overall, the amortised cost of processing each additional frame could be roughly
-    <strong>3&ndash;5&times; lower</strong> (&asymp;3&ndash;5&thinsp;MMACs/frame) compared to the naive per-frame pass.
-    This would reduce throughput requirements from &asymp;1.57&thinsp;GMACs/s to <strong>&asymp;0.3&ndash;0.5&thinsp;GMACs/s</strong>.
-    However, this requires a custom streaming implementation &mdash; the current PyTorch code
-    processes each context window as an independent tensor.
+    <strong>Streaming inference:</strong>
+    The MVAD_V2 model uses center-aligned convolutions (padding = k//2) so each output frame
+    depends on 35 future frames (350&thinsp;ms lookahead) and 35 past frames.
+    The total receptive field is <strong>710&thinsp;ms</strong> (71 frames),
+    providing 4.7&times; wider temporal context than V1 (150&thinsp;ms) while using 600&times; fewer MACs.
+    The 350&thinsp;ms lookahead fits well within the 1&thinsp;s latency budget.
 </div>
 </div>
 
@@ -369,9 +352,11 @@ The model processes one frame every 10&thinsp;ms at 100&thinsp;frames/s.</p>
 <div class="grid2">
     <table>
     <tr><th>Parameter</th><th>Value</th></tr>
-    <tr><td>Architecture</td><td><strong>CNN (2D)</strong></td></tr>
-    <tr><td>Model parameters</td><td>156,643</td></tr>
-    <tr><td>Context frames</td><td>15 (150 ms)</td></tr>
+    <tr><td>Architecture</td><td><strong>DS-Conv1D (MVAD_V2)</strong></td></tr>
+    <tr><td>Model parameters</td><td>27,235</td></tr>
+    <tr><td>Hidden channels</td><td>64</td></tr>
+    <tr><td>DS-Conv blocks</td><td>5</td></tr>
+    <tr><td>Kernel size</td><td>15</td></tr>
     <tr><td>Mel bands</td><td>40</td></tr>
     <tr><td>Analysis window</td><td>25 ms</td></tr>
     <tr><td>Hop</td><td>10 ms</td></tr>
@@ -380,20 +365,23 @@ The model processes one frame every 10&thinsp;ms at 100&thinsp;frames/s.</p>
     <table>
     <tr><th>Parameter</th><th>Value</th></tr>
     <tr><td>Optimizer</td><td>Adam (lr = 0.001)</td></tr>
-    <tr><td>Batch size</td><td>256</td></tr>
-    <tr><td>Dropout</td><td>0.3</td></tr>
+    <tr><td>Batch size</td><td>64</td></tr>
+    <tr><td>Chunk frames</td><td>500 (5 s)</td></tr>
+    <tr><td>Dropout</td><td>0.1</td></tr>
     <tr><td>Class weighting</td><td>Overlap boost &times;2.0</td></tr>
-    <tr><td>Augmentation</td><td>SpecAugment</td></tr>
-    <tr><td>Best epoch</td><td>47 / 62 (early stop)</td></tr>
+    <tr><td>Augmentation</td><td>None</td></tr>
+    <tr><td>Best epoch</td><td>46 / 61 (early stop)</td></tr>
     <tr><td>Max epochs</td><td>100 (patience=15)</td></tr>
-    <tr><td>Training time</td><td>&asymp;2,222 s (&asymp;37 min, GPU)</td></tr>
+    <tr><td>Training time</td><td>&asymp;30 s (GPU)</td></tr>
     </table>
 </div>
 
 <div class="info-box">
-    <strong>SpecAugment:</strong> During training, frequency bands and time bands
-    are randomly masked on mel patches &mdash; this is a regularization technique preventing
-    overfitting. <strong>Overlap weight boost (&times;2.0)</strong> increases the cost of errors on the overlap class
+    <strong>Depthwise-Separable Convolutions:</strong> Each DS block first applies a <em>depthwise</em> conv
+    (each channel processed independently with its own k=15 filter), followed by a <em>pointwise</em>
+    conv (1&times;1 kernel mixing channels). This factorization reduces MACs from C&times;C&times;K to C&times;K + C&times;C
+    per time step &mdash; approximately <strong>12&times; savings</strong> for C=64, K=15.
+    <strong>Overlap weight boost (&times;2.0)</strong> increases the cost of errors on the overlap class
     in the loss function, compensating for the imbalanced class distribution.
 </div>
 </div>
@@ -402,15 +390,17 @@ The model processes one frame every 10&thinsp;ms at 100&thinsp;frames/s.</p>
 <h2>4. Key Differences Between Methods</h2>
 <div class="card">
 <table>
-<tr><th style="width:25%">Aspect</th><th style="width:37%"><span class="badge badge-trad">Traditional (SP)</span></th><th style="width:38%"><span class="badge badge-dnn">DNN (CNN)</span></th></tr>
+<tr><th style="width:25%">Aspect</th><th style="width:37%"><span class="badge badge-trad">Traditional (SP)</span></th><th style="width:38%"><span class="badge badge-dnn">DNN V2 (DS-Conv1D)</span></th></tr>
 <tr><td>Approach</td><td>Manual rules + heuristics</td><td>Automatically learned from data</td></tr>
 <tr><td>Input features</td><td>8 hand-crafted (YIN, HNR, bandwidth&hellip;)</td><td>40 mel-filterbank bands (raw spectrum)</td></tr>
-<tr><td>Temporal context</td><td>&plusmn;3 frames (max-pool smoothing)</td><td>&plusmn;7 frames (CNN window)</td></tr>
+<tr><td>Temporal context</td><td>&plusmn;3 frames (max-pool smoothing)</td><td>710 ms receptive field (71 frames)</td></tr>
 <tr><td>Adaptation</td><td>Percentile-based thresholds per file</td><td>Z-score from global training statistics</td></tr>
-<tr><td>Training phase</td><td>None &mdash; works out of the box</td><td>Required (&asymp;2,222 s on GPU)</td></tr>
+<tr><td>Training phase</td><td>None &mdash; works out of the box</td><td>Required (&asymp;30 s on GPU)</td></tr>
 <tr><td>Hardware requirements</td><td>CPU only</td><td>GPU speeds up inference (CPU also works)</td></tr>
 <tr><td>Interpretability</td><td>High &mdash; visible features and weights</td><td>Low &mdash; &ldquo;black box&rdquo;</td></tr>
-<tr><td>Model parameters</td><td>&sim;15 manually tuned hyper-parameters</td><td>156,643 learned weights</td></tr>
+<tr><td>Model parameters</td><td>&sim;15 manually tuned hyper-parameters</td><td>27,235 learned weights</td></tr>
+<tr><td>Complexity (MMACs/s)</td><td>N/A (sequential processing)</td><td>2.59 (vs 1,567 for V1 CNN)</td></tr>
+<tr><td>Lookahead / Latency</td><td>None (causal)</td><td>350 ms (within 1 s budget)</td></tr>
 </table>
 </div>
 
@@ -418,10 +408,10 @@ The model processes one frame every 10&thinsp;ms at 100&thinsp;frames/s.</p>
 <h2>5. Comparison Results &mdash; Key Metrics</h2>
 
 <div class="grid4">
-    <div class="card kpi dnn-kpi"><div class="value">94.1%</div><div class="label">3-Class Accuracy</div><div class="sub" style="color:var(--accent2);">DNN: +30.7 pp vs Trad (63.4%)</div></div>
-    <div class="card kpi dnn-kpi"><div class="value">94.4%</div><div class="label">Macro F1</div><div class="sub" style="color:var(--accent2);">DNN: +30.7 pp vs Trad (63.7%)</div></div>
-    <div class="card kpi good"><div class="value">91.8%</div><div class="label">Overlap F1</div><div class="sub" style="color:var(--accent2);">DNN: +48.1 pp vs Trad (43.7%)</div></div>
-    <div class="card kpi warn"><div class="value">4.0&times;</div><div class="label">Speed Advantage</div><div class="sub">DNN: 29.8 s vs Trad: 119.0 s</div></div>
+    <div class="card kpi dnn-kpi"><div class="value">91.8%</div><div class="label">3-Class Accuracy</div><div class="sub" style="color:var(--accent2);">DNN V2: +28.4 pp vs Trad (63.4%)</div></div>
+    <div class="card kpi dnn-kpi"><div class="value">92.2%</div><div class="label">Macro F1</div><div class="sub" style="color:var(--accent2);">DNN V2: +28.5 pp vs Trad (63.7%)</div></div>
+    <div class="card kpi good"><div class="value">89.5%</div><div class="label">Overlap F1</div><div class="sub" style="color:var(--accent2);">DNN V2: +45.8 pp vs Trad (43.7%)</div></div>
+    <div class="card kpi good"><div class="value">600&times;</div><div class="label">Complexity Savings</div><div class="sub">V2: 2.59 MMACs/s vs V1: 1,567</div></div>
 </div>
 
 <!-- ════════════════════ 6. DETAILED TABLE ════════════════════ -->
@@ -429,47 +419,50 @@ The model processes one frame every 10&thinsp;ms at 100&thinsp;frames/s.</p>
 <div class="card">
 <table>
 <thead>
-<tr><th style="width:40%">Metric</th><th class="num" style="width:18%">Traditional</th><th class="num" style="width:18%">DNN</th><th class="num" style="width:24%">&Delta; (DNN &minus; Trad)</th></tr>
+<tr><th style="width:40%">Metric</th><th class="num" style="width:18%">Traditional</th><th class="num" style="width:18%">DNN V2</th><th class="num" style="width:24%">&Delta; (DNN V2 &minus; Trad)</th></tr>
 </thead>
 <tbody>
-<tr style="background:var(--primary-light);"><td><strong>3-class accuracy</strong></td><td class="num trad-val">63.4%</td><td class="num dnn-val">94.1%</td><td class="num delta-pos">+30.7 pp</td></tr>
-<tr style="background:var(--primary-light);"><td><strong>Macro F1</strong></td><td class="num trad-val">63.7%</td><td class="num dnn-val">94.4%</td><td class="num delta-pos">+30.7 pp</td></tr>
-<tr style="background:var(--primary-light);"><td><strong>Macro Precision</strong></td><td class="num trad-val">63.0%</td><td class="num dnn-val">94.0%</td><td class="num delta-pos">+31.0 pp</td></tr>
-<tr style="background:var(--primary-light);"><td><strong>Macro Recall</strong></td><td class="num trad-val">64.9%</td><td class="num dnn-val">94.7%</td><td class="num delta-pos">+29.8 pp</td></tr>
+<tr style="background:var(--primary-light);"><td><strong>3-class accuracy</strong></td><td class="num trad-val">63.4%</td><td class="num dnn-val">91.8%</td><td class="num delta-pos">+28.4 pp</td></tr>
+<tr style="background:var(--primary-light);"><td><strong>Macro F1</strong></td><td class="num trad-val">63.7%</td><td class="num dnn-val">92.2%</td><td class="num delta-pos">+28.5 pp</td></tr>
+<tr style="background:var(--primary-light);"><td><strong>Macro Precision</strong></td><td class="num trad-val">63.0%</td><td class="num dnn-val">91.6%</td><td class="num delta-pos">+28.6 pp</td></tr>
+<tr style="background:var(--primary-light);"><td><strong>Macro Recall</strong></td><td class="num trad-val">64.9%</td><td class="num dnn-val">93.0%</td><td class="num delta-pos">+28.1 pp</td></tr>
 
 <tr><td colspan="4" style="padding:8px 12px; color:var(--text2); font-weight:600; font-size:.82rem; background:#f8fafc;">PER-CLASS &mdash; SILENCE</td></tr>
-<tr><td>&emsp;Silence &mdash; F1</td><td class="num trad-val">82.5%</td><td class="num dnn-val">97.4%</td><td class="num delta-pos">+14.9 pp</td></tr>
-<tr><td>&emsp;Silence &mdash; Precision</td><td class="num trad-val">77.0%</td><td class="num dnn-val">96.9%</td><td class="num delta-pos">+19.9 pp</td></tr>
-<tr><td>&emsp;Silence &mdash; Recall</td><td class="num trad-val">88.8%</td><td class="num dnn-val">97.8%</td><td class="num delta-pos">+9.0 pp</td></tr>
+<tr><td>&emsp;Silence &mdash; F1</td><td class="num trad-val">82.5%</td><td class="num dnn-val">95.6%</td><td class="num delta-pos">+13.1 pp</td></tr>
+<tr><td>&emsp;Silence &mdash; Precision</td><td class="num trad-val">77.0%</td><td class="num dnn-val">94.5%</td><td class="num delta-pos">+17.5 pp</td></tr>
+<tr><td>&emsp;Silence &mdash; Recall</td><td class="num trad-val">88.8%</td><td class="num dnn-val">96.7%</td><td class="num delta-pos">+7.9 pp</td></tr>
 
 <tr><td colspan="4" style="padding:8px 12px; color:var(--text2); font-weight:600; font-size:.82rem; background:#f8fafc;">PER-CLASS &mdash; SINGLE SPEAKER</td></tr>
-<tr><td>&emsp;Single &mdash; F1</td><td class="num trad-val">64.8%</td><td class="num dnn-val">94.0%</td><td class="num delta-pos">+29.2 pp</td></tr>
-<tr><td>&emsp;Single &mdash; Precision</td><td class="num trad-val">64.0%</td><td class="num dnn-val">95.4%</td><td class="num delta-pos">+31.4 pp</td></tr>
-<tr><td>&emsp;Single &mdash; Recall</td><td class="num trad-val">65.5%</td><td class="num dnn-val">92.6%</td><td class="num delta-pos">+27.1 pp</td></tr>
+<tr><td>&emsp;Single &mdash; F1</td><td class="num trad-val">64.8%</td><td class="num dnn-val">91.5%</td><td class="num delta-pos">+26.7 pp</td></tr>
+<tr><td>&emsp;Single &mdash; Precision</td><td class="num trad-val">64.0%</td><td class="num dnn-val">95.0%</td><td class="num delta-pos">+31.0 pp</td></tr>
+<tr><td>&emsp;Single &mdash; Recall</td><td class="num trad-val">65.5%</td><td class="num dnn-val">88.3%</td><td class="num delta-pos">+22.8 pp</td></tr>
 
 <tr><td colspan="4" style="padding:8px 12px; color:var(--text2); font-weight:600; font-size:.82rem; background:#f8fafc;">PER-CLASS &mdash; OVERLAP</td></tr>
-<tr><td>&emsp;Overlap &mdash; F1</td><td class="num trad-val">43.7%</td><td class="num dnn-val">91.8%</td><td class="num delta-pos">+48.1 pp</td></tr>
-<tr><td>&emsp;Overlap &mdash; Precision</td><td class="num trad-val">47.8%</td><td class="num dnn-val">89.8%</td><td class="num delta-pos">+42.0 pp</td></tr>
-<tr><td>&emsp;Overlap &mdash; Recall</td><td class="num trad-val">40.3%</td><td class="num dnn-val">93.8%</td><td class="num delta-pos">+53.5 pp</td></tr>
+<tr><td>&emsp;Overlap &mdash; F1</td><td class="num trad-val">43.7%</td><td class="num dnn-val">89.5%</td><td class="num delta-pos">+45.8 pp</td></tr>
+<tr><td>&emsp;Overlap &mdash; Precision</td><td class="num trad-val">47.8%</td><td class="num dnn-val">85.2%</td><td class="num delta-pos">+37.4 pp</td></tr>
+<tr><td>&emsp;Overlap &mdash; Recall</td><td class="num trad-val">40.3%</td><td class="num dnn-val">94.2%</td><td class="num delta-pos">+53.9 pp</td></tr>
 
 <tr><td colspan="4" style="padding:8px 12px; color:var(--text2); font-weight:600; font-size:.82rem; background:#f8fafc;">BINARY &mdash; SPEECH vs SILENCE</td></tr>
-<tr><td>&emsp;Binary Speech/Sil &mdash; F1</td><td class="num trad-val">94.6%</td><td class="num dnn-val">99.2%</td><td class="num delta-pos">+4.6 pp</td></tr>
-<tr><td>&emsp;Binary Speech/Sil &mdash; Precision</td><td class="num trad-val">96.7%</td><td class="num dnn-val">99.4%</td><td class="num delta-pos">+2.7 pp</td></tr>
-<tr><td>&emsp;Binary Speech/Sil &mdash; Recall</td><td class="num trad-val">92.5%</td><td class="num dnn-val">99.1%</td><td class="num delta-pos">+6.6 pp</td></tr>
+<tr><td>&emsp;Binary Speech/Sil &mdash; F1</td><td class="num trad-val">94.6%</td><td class="num dnn-val">98.7%</td><td class="num delta-pos">+4.1 pp</td></tr>
+<tr><td>&emsp;Binary Speech/Sil &mdash; Precision</td><td class="num trad-val">96.7%</td><td class="num dnn-val">99.1%</td><td class="num delta-pos">+2.4 pp</td></tr>
+<tr><td>&emsp;Binary Speech/Sil &mdash; Recall</td><td class="num trad-val">92.5%</td><td class="num dnn-val">98.4%</td><td class="num delta-pos">+5.9 pp</td></tr>
 
 <tr><td colspan="4" style="padding:8px 12px; color:var(--text2); font-weight:600; font-size:.82rem; background:#f8fafc;">BINARY &mdash; OVERLAP vs REST</td></tr>
-<tr><td>&emsp;Binary Overlap &mdash; F1</td><td class="num trad-val">43.7%</td><td class="num dnn-val">91.8%</td><td class="num delta-pos">+48.1 pp</td></tr>
-<tr><td>&emsp;Binary Overlap &mdash; Accuracy</td><td class="num trad-val">70.4%</td><td class="num dnn-val">95.2%</td><td class="num delta-pos">+24.8 pp</td></tr>
+<tr><td>&emsp;Binary Overlap &mdash; F1</td><td class="num trad-val">43.7%</td><td class="num dnn-val">89.5%</td><td class="num delta-pos">+45.8 pp</td></tr>
+<tr><td>&emsp;Binary Overlap &mdash; Accuracy</td><td class="num trad-val">70.4%</td><td class="num dnn-val">93.7%</td><td class="num delta-pos">+23.3 pp</td></tr>
 
 <tr><td colspan="4" style="padding:8px 12px; color:var(--text2); font-weight:600; font-size:.82rem; background:#f8fafc;">PER-FILE ACCURACY</td></tr>
-<tr><td>&emsp;Mean</td><td class="num trad-val">63.4%</td><td class="num dnn-val">94.1%</td><td class="num delta-pos">+30.7 pp</td></tr>
-<tr><td>&emsp;Std</td><td class="num" style="color:var(--text2);">10.8%</td><td class="num" style="color:var(--text2);">3.6%</td><td class="num delta-pos">&minus;7.2 pp (more stable)</td></tr>
-<tr><td>&emsp;Min</td><td class="num trad-val">31.8%</td><td class="num dnn-val">82.8%</td><td class="num delta-pos">+51.0 pp</td></tr>
+<tr><td>&emsp;Mean</td><td class="num trad-val">63.4%</td><td class="num dnn-val">91.8%</td><td class="num delta-pos">+28.4 pp</td></tr>
+<tr><td>&emsp;Std</td><td class="num" style="color:var(--text2);">10.8%</td><td class="num" style="color:var(--text2);">4.7%</td><td class="num delta-pos">&minus;6.1 pp (more stable)</td></tr>
+<tr><td>&emsp;Min</td><td class="num trad-val">31.8%</td><td class="num dnn-val">81.0%</td><td class="num delta-pos">+49.2 pp</td></tr>
 <tr><td>&emsp;Max</td><td class="num" style="color:var(--text2);">100.0%</td><td class="num" style="color:var(--text2);">100.0%</td><td class="num" style="color:var(--text2);">&mdash;</td></tr>
 
-<tr><td colspan="4" style="padding:8px 12px; color:var(--text2); font-weight:600; font-size:.82rem; background:#f8fafc;">PERFORMANCE</td></tr>
-<tr><td>&emsp;Processing time (100 files)</td><td class="num trad-val">119.0 s</td><td class="num dnn-val">29.8 s</td><td class="num delta-pos">4.0&times; faster</td></tr>
-<tr><td>&emsp;Real-Time Factor</td><td class="num" style="color:var(--text2);">0.079</td><td class="num" style="color:var(--text2);">0.020</td><td class="num delta-pos">4.0&times; faster</td></tr>
+<tr><td colspan="4" style="padding:8px 12px; color:var(--text2); font-weight:600; font-size:.82rem; background:#f8fafc;">MODEL COMPLEXITY</td></tr>
+<tr><td>&emsp;Parameters</td><td class="num" style="color:var(--text2);">N/A</td><td class="num dnn-val">27,235</td><td class="num" style="color:var(--text2);">&mdash;</td></tr>
+<tr><td>&emsp;MMACs/s</td><td class="num" style="color:var(--text2);">N/A</td><td class="num dnn-val">2.59</td><td class="num" style="color:var(--text2);">&mdash;</td></tr>
+<tr><td>&emsp;Receptive field</td><td class="num" style="color:var(--text2);">~70 ms</td><td class="num dnn-val">710 ms</td><td class="num delta-pos">+640 ms</td></tr>
+<tr><td>&emsp;Lookahead</td><td class="num" style="color:var(--text2);">0 ms</td><td class="num dnn-val">350 ms</td><td class="num" style="color:var(--text2);">&mdash;</td></tr>
+<tr><td>&emsp;Training time</td><td class="num" style="color:var(--text2);">&mdash;</td><td class="num dnn-val">&asymp;30 s</td><td class="num" style="color:var(--text2);">&mdash;</td></tr>
 </tbody>
 </table>
 </div>
@@ -486,7 +479,7 @@ The model processes one frame every 10&thinsp;ms at 100&thinsp;frames/s.</p>
     <div class="card"><h3 style="text-align:center;">Per-File Accuracy Distribution</h3><div class="chart-container"><canvas id="chartHist"></canvas></div></div>
 </div>
 <div class="card">
-    <h3 style="text-align:center;">DNN Learning Curve &mdash; 62 Epochs (Early Stop, Best at Epoch 47)</h3>
+    <h3 style="text-align:center;">DNN V2 Learning Curve &mdash; 61 Epochs (Early Stop, Best at Epoch 46)</h3>
     <div class="chart-container"><canvas id="chartTraining"></canvas></div>
 </div>
 
@@ -515,28 +508,32 @@ The model processes one frame every 10&thinsp;ms at 100&thinsp;frames/s.</p>
         </p>
     </div>
 
-    <!-- DNN -->
+    <!-- DNN V2 -->
     <div class="cm-card" style="border-top: 3px solid var(--dnn);">
-        <h4 style="color:var(--dnn);">DNN (CNN)</h4>
+        <h4 style="color:var(--dnn);">DNN V2 (DS-Conv1D)</h4>
         <table class="cm-table">
         <thead><tr><th></th><th>Pred: Silence</th><th>Pred: Single</th><th>Pred: Overlap</th><th>Total</th></tr></thead>
         <tbody>
-        <tr><td><strong>GT: Silence</strong></td><td class="diag">32,317<br><small>(97.8%)</small></td><td class="off">663</td><td class="off">50</td><td>33,030</td></tr>
-        <tr><td><strong>GT: Single</strong></td><td class="off">1,020</td><td class="diag">68,485<br><small>(92.6%)</small></td><td class="off">4,491</td><td>73,996</td></tr>
-        <tr><td><strong>GT: Overlap</strong></td><td class="off">20</td><td class="off">2,622</td><td class="diag">40,132<br><small>(93.8%)</small></td><td>42,774</td></tr>
+        <tr><td><strong>GT: Silence</strong></td><td class="diag">32,116<br><small>(96.7%)</small></td><td class="off">984</td><td class="off">115</td><td>33,215</td></tr>
+        <tr><td><strong>GT: Single</strong></td><td class="off">1,815</td><td class="diag">65,381<br><small>(88.3%)</small></td><td class="off">6,880</td><td>74,076</td></tr>
+        <tr><td><strong>GT: Overlap</strong></td><td class="off">54</td><td class="off">2,450</td><td class="diag">40,305<br><small>(94.2%)</small></td><td>42,809</td></tr>
         </tbody>
         </table>
         <p style="text-align:center; margin-top:8px; color:var(--text2); font-size:.85rem;">
-            Correct: 140,934 / 149,800 = <strong style="color:var(--dnn);">94.1%</strong>
+            Correct: 137,802 / 150,100 = <strong style="color:var(--dnn);">91.8%</strong>
         </p>
     </div>
 </div>
 
 <div class="info-box">
     <strong>Main weakness of the traditional method:</strong> Confusing overlap with single speaker (24,496 GT:overlap
-    frames classified as single). DNN drastically reduces this error (down to 2,622 frames).
+    frames classified as single). DNN V2 drastically reduces this error (down to 2,450 frames).
     The traditional method also suffers from false overlap alarms &mdash; 17,826 single-speaker frames
-    incorrectly labeled as overlap. The DNN reduces this to only 4,491.
+    incorrectly labeled as overlap. The DNN V2 reduces this to 6,880.
+    <br><br>
+    <strong>Note on V2 vs V1:</strong> The V2 model (27K params, 2.59 MMACs/s) achieves slightly lower accuracy
+    than V1 (157K params, 1,567 MMACs/s) &mdash; 91.8% vs 94.1% &mdash; but at <strong>600&times; lower computational cost</strong>,
+    making it far more suitable for embedded and real-time streaming deployment.
 </div>
 </div>
 
@@ -544,20 +541,20 @@ The model processes one frame every 10&thinsp;ms at 100&thinsp;frames/s.</p>
 <h2>9. Conclusions</h2>
 <div class="grid2">
     <div class="card">
-        <h3>DNN Wins Across All Metrics</h3>
-        <p>The CNN model achieves <strong>94.1% accuracy</strong> vs 63.4% &mdash; a lead of over 30 percentage points.
-        The improvement is especially impressive on the hardest class &mdash; <strong>overlap F1 rose from 43.7% to 91.8%</strong> (+48.1 pp).</p>
+        <h3>DNN V2 Wins Across All Metrics</h3>
+        <p>The DS-Conv1D model achieves <strong>91.8% accuracy</strong> vs 63.4% &mdash; a lead of over 28 percentage points.
+        The improvement is especially impressive on the hardest class &mdash; <strong>overlap F1 rose from 43.7% to 89.5%</strong> (+45.8 pp).</p>
     </div>
     <div class="card">
-        <h3>DNN Stability</h3>
-        <p>The standard deviation of per-file accuracy for DNN is only <strong>3.6%</strong> (vs 10.8% for the traditional method).
-        The worst-case DNN file reaches 82.8%, while the traditional method drops as low as 31.8%.</p>
+        <h3>DNN V2 Stability</h3>
+        <p>The standard deviation of per-file accuracy for DNN V2 is only <strong>4.7%</strong> (vs 10.8% for the traditional method).
+        The worst-case DNN V2 file reaches 81.0%, while the traditional method drops as low as 31.8%.</p>
     </div>
     <div class="card">
-        <h3>DNN Is Faster</h3>
-        <p>Thanks to GPU vectorization and batching, DNN processes 100 files in <strong>29.8 s</strong>
-        (RTF = 0.020), while the traditional method requires 119.0 s (RTF = 0.079).
-        That is a <strong>4&times; speedup</strong>.</p>
+        <h3>Extreme Efficiency</h3>
+        <p>MVAD_V2 requires only <strong>2.59 MMACs/s</strong> &mdash; approximately <strong>600&times; lighter</strong> than the V1 CNN (1,567 MMACs/s).
+        With only <strong>27,235 parameters</strong> (5.7&times; fewer than V1), it is highly suitable for embedded
+        deployment and real-time streaming on low-power devices.</p>
     </div>
     <div class="card">
         <h3>Advantage of the Traditional Method</h3>
@@ -568,8 +565,9 @@ The model processes one frame every 10&thinsp;ms at 100&thinsp;frames/s.</p>
 </div>
 
 <footer>
-    Multi-Voice Activity Detection &mdash; Comparison Report &middot; Generated 2026-03-16 &middot;
-    Test set: 100 files &middot; 149,800 frames &middot; mvad_test.py
+    Multi-Voice Activity Detection &mdash; Comparison Report &middot; Generated 2026-03-23 &middot;
+    DNN: MVAD_V2 (DS-Conv1D, epoch 46) &middot;
+    Test set: 100 files &middot; 150,100 frames &middot; mvad_test.py
 </footer>
 
 </div><!-- /container -->
@@ -592,7 +590,7 @@ new Chart(document.getElementById('chartF1'), {
     labels: ['Silence', 'Single', 'Overlap', 'Macro F1'],
     datasets: [
       { label: 'Traditional', data: [82.5, 64.8, 43.7, 63.7], backgroundColor: TRAD, borderRadius: 4 },
-      { label: 'DNN (CNN)',   data: [97.4, 94.0, 91.8, 94.4], backgroundColor: DNN_,  borderRadius: 4 },
+      { label: 'DNN V2',      data: [95.6, 91.5, 89.5, 92.2], backgroundColor: DNN_,  borderRadius: 4 },
     ]
   },
   options: {
@@ -609,7 +607,7 @@ new Chart(document.getElementById('chartPR'), {
     labels: ['Sil P', 'Sil R', 'Single P', 'Single R', 'Overlap P', 'Overlap R'],
     datasets: [
       { label: 'Traditional', data: [77.0, 88.8, 64.0, 65.5, 47.8, 40.3], backgroundColor: TRAD, borderRadius: 4 },
-      { label: 'DNN (CNN)',   data: [96.9, 97.8, 95.4, 92.6, 89.8, 93.8], backgroundColor: DNN_,  borderRadius: 4 },
+      { label: 'DNN V2',      data: [94.5, 96.7, 95.0, 88.3, 85.2, 94.2], backgroundColor: DNN_,  borderRadius: 4 },
     ]
   },
   options: {
@@ -626,7 +624,7 @@ new Chart(document.getElementById('chartRadar'), {
     labels: ['3-class Acc', 'Macro F1', 'Silence F1', 'Single F1', 'Overlap F1', 'Speech/Sil F1', 'Overlap Binary F1'],
     datasets: [
       { label: 'Traditional', data: [63.4, 63.7, 82.5, 64.8, 43.7, 94.6, 43.7], borderColor: TRAD, backgroundColor: TRAD_BG, pointBackgroundColor: TRAD, borderWidth: 2 },
-      { label: 'DNN (CNN)',   data: [94.1, 94.4, 97.4, 94.0, 91.8, 99.2, 91.8], borderColor: DNN_,  backgroundColor: DNN_BG,  pointBackgroundColor: DNN_,  borderWidth: 2 },
+      { label: 'DNN V2',      data: [91.8, 92.2, 95.6, 91.5, 89.5, 98.7, 89.5], borderColor: DNN_,  backgroundColor: DNN_BG,  pointBackgroundColor: DNN_,  borderWidth: 2 },
     ]
   },
   options: {
@@ -638,7 +636,7 @@ new Chart(document.getElementById('chartRadar'), {
 
 // ── Per-file accuracy histogram ──
 const tradAccs = [69.56,60.88,74.9,56.94,72.36,56.34,49.2,55.74,63.75,69.76,52.2,61.21,72.7,57.34,52.67,77.57,60.61,50.8,68.62,69.03,71.09,75.43,44.33,62.68,50.47,55.34,65.42,71.56,52.47,60.41,75.23,60.95,80.64,64.02,58.48,70.09,47.8,75.1,62.35,76.57,65.42,42.32,71.03,70.29,72.56,55.54,63.48,63.82,68.22,75.37,62.88,76.1,75.37,74.1,62.48,77.04,62.88,70.96,63.48,66.02,61.01,55.61,65.95,67.16,66.89,66.56,46.26,64.49,64.75,65.75,60.81,67.42,59.28,55.67,100.0,43.52,56.94,71.7,74.97,53.81,66.96,62.75,64.89,54.34,71.16,68.83,68.29,100.0,58.41,72.03,64.89,47.86,57.21,42.26,50.07,63.55,31.84,44.86,61.82,51.4];
-const dnnAccs  = [98.93,89.52,98.40,96.86,98.87,93.12,93.66,89.19,89.52,91.99,91.92,89.79,98.66,92.52,92.92,94.66,93.52,92.12,91.39,96.60,98.80,98.33,94.79,90.79,88.85,91.05,92.46,99.33,97.66,89.79,97.60,98.40,98.87,97.33,93.59,96.80,92.26,98.93,96.06,98.20,96.73,89.59,89.59,98.33,94.59,94.66,95.39,94.39,98.73,96.86,93.12,98.80,97.73,92.32,91.72,96.13,95.66,93.99,90.59,95.73,85.51,90.85,90.39,90.65,88.58,94.06,91.66,95.53,94.13,98.33,91.52,95.53,92.99,89.39,100.0,91.46,87.52,97.66,93.93,92.26,99.40,97.13,94.53,91.19,98.33,91.66,93.72,100.0,95.59,99.00,95.33,91.12,91.26,87.25,90.79,92.92,92.46,82.78,98.26,94.79];
+const dnnAccs  = [98.4,87.48,97.47,95.87,98.73,87.28,94.4,86.94,86.94,86.94,86.61,90.74,98.13,86.74,88.74,93.2,89.54,91.47,89.54,94.94,97.8,98.4,94.94,86.81,84.68,87.81,90.47,98.6,95.54,87.54,95.87,98.13,98.4,93.8,85.08,93.2,88.27,96.14,94.4,98.33,93.6,82.61,86.34,96.34,92.74,95.4,92.34,89.14,97.47,93.07,87.41,97.4,95.54,92.27,92.21,91.07,94.74,91.27,81.81,91.27,83.08,89.41,88.61,87.81,85.74,93.27,90.47,95.54,93.67,97.34,86.01,95.07,91.67,83.88,100.0,90.61,80.95,94.0,93.4,85.21,98.47,94.14,94.27,86.88,97.87,92.67,92.14,100.0,94.87,97.73,93.74,86.08,87.61,86.08,89.87,92.94,88.87,82.74,96.4,93.2];
 
 function buildHistBins(data, binMin, binMax, binSize) {
   const nBins = Math.ceil((binMax - binMin) / binSize);
@@ -657,7 +655,7 @@ new Chart(document.getElementById('chartHist'), {
     labels: histT.labels,
     datasets: [
       { label: 'Traditional', data: histT.counts, backgroundColor: TRAD, borderRadius: 4 },
-      { label: 'DNN (CNN)',   data: histD.counts, backgroundColor: DNN_,  borderRadius: 4 },
+      { label: 'DNN V2',      data: histD.counts, backgroundColor: DNN_,  borderRadius: 4 },
     ]
   },
   options: {
@@ -667,26 +665,26 @@ new Chart(document.getElementById('chartHist'), {
   }
 });
 
-// ── Training curve (62 epochs, best at epoch 47) ──
-const epochs = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62];
-const trainAcc = [82.11,87.32,88.59,89.44,90.08,90.64,90.89,91.23,91.49,91.71,91.87,92.02,92.17,92.27,92.33,92.42,92.55,92.63,93.43,93.70,93.79,93.89,93.93,93.95,94.03,94.07,94.08,94.14,94.19,94.21,94.22,94.24,94.30,94.30,94.35,94.91,95.05,95.06,95.18,95.15,95.23,95.26,95.27,95.30,95.30,95.31,95.40,95.38,95.36,95.37,95.39,95.36,95.42,95.47,95.41,95.45,95.80,95.90,95.95,95.95,96.02,96.01];
-const valMacroF1 = [89.13,90.52,91.05,91.75,91.72,91.60,91.14,91.00,93.34,93.04,92.63,92.69,91.95,89.12,92.46,93.15,93.57,92.11,93.73,93.94,93.45,93.74,93.72,94.04,94.01,94.28,94.01,93.73,93.55,93.59,93.83,93.99,94.37,93.99,94.35,94.51,94.50,94.64,94.52,94.41,94.54,94.36,94.40,94.41,94.52,94.82,94.84,94.13,94.33,94.45,94.50,94.70,94.32,94.76,94.64,94.62,94.90,94.85,94.97,94.79,94.73,94.82];
-const valSilF1  = [92.19,93.05,93.36,93.43,92.86,94.47,94.91,95.06,95.36,95.02,95.35,94.91,95.29,95.10,94.27,95.86,95.87,94.72,96.19,96.63,96.47,96.55,96.35,96.47,96.94,96.71,96.91,96.63,96.58,96.11,96.79,96.66,96.97,96.86,96.98,97.28,97.05,97.06,97.19,97.18,97.21,97.30,97.21,97.20,97.22,97.46,97.37,97.15,97.24,96.89,97.34,97.49,97.11,97.40,97.57,97.45,97.68,97.60,97.71,97.53,97.60,97.65];
-const valSingF1 = [88.03,89.56,90.19,91.09,91.10,90.71,89.92,89.74,92.88,92.51,91.83,92.00,90.88,86.82,91.75,92.47,93.05,91.21,93.16,93.34,92.72,93.08,93.07,93.56,93.40,93.79,93.38,93.06,92.79,92.95,93.14,93.39,93.90,93.38,93.84,93.98,94.00,94.19,94.01,93.84,94.00,93.77,93.82,93.85,93.97,94.33,94.42,93.46,93.73,93.97,93.94,94.19,93.75,94.29,94.10,94.09,94.41,94.36,94.50,94.32,94.22,94.33];
-const valOvlF1  = [87.16,88.95,89.60,90.72,91.20,89.60,88.58,88.21,91.79,91.60,90.71,91.15,89.68,85.44,91.35,91.13,91.80,90.41,91.82,91.85,91.14,91.57,91.72,92.10,91.69,92.33,91.74,91.51,91.28,91.71,91.57,91.93,92.23,91.74,92.23,92.26,92.45,92.67,92.38,92.21,92.40,92.02,92.17,92.18,92.36,92.66,92.71,91.77,92.02,92.51,92.22,92.43,92.11,92.60,92.25,92.34,92.60,92.59,92.71,92.54,92.39,92.49];
+// ── Training curve (61 epochs, best at epoch 46) ──
+const epochs = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61];
+const trainAcc = [55.47,72.75,79.34,82.66,84.69,86.01,87.31,87.94,88.69,89.02,89.97,89.18,90.38,90.8,90.47,91.2,91.12,91.15,91.98,92.07,92.58,91.96,92.58,92.54,92.83,92.84,92.7,92.49,93.2,92.63,93.25,93.39,93.42,93.41,93.64,93.26,93.61,93.91,94.31,94.0,94.16,94.45,94.37,94.49,94.3,94.39,94.28,94.48,94.6,94.59,94.6,94.83,94.91,94.69,94.75,94.78,94.97,94.87,94.85,94.84,94.85];
+const valMacroF1 = [42.95,73.61,85.62,86.56,86.82,88.13,87.34,89.74,89.86,89.59,88.87,90.73,90.75,90.15,90.72,91.19,90.04,91.56,90.77,91.88,91.9,92.09,92.05,91.46,92.1,90.72,92.15,92.08,92.49,92.21,92.28,92.43,91.95,92.49,92.59,92.87,91.96,92.76,92.85,92.88,92.92,93.12,92.98,93.07,93.0,93.14,93.16,93.04,93.11,93.03,93.04,93.09,92.97,93.06,93.07,93.05,93.12,93.19,93.18,93.03,93.08];
+const valSilF1  = [56.57,82.15,90.67,90.56,91.56,92.05,92.28,92.63,92.52,92.6,93.02,93.36,92.83,93.34,92.58,93.76,93.4,93.87,94.14,94.17,94.42,94.56,94.38,94.06,94.45,94.4,94.67,94.71,94.53,94.37,94.85,94.9,95.04,95.34,94.99,95.28,95.29,95.29,95.32,95.3,95.41,95.78,95.58,95.52,95.63,95.67,95.84,95.63,95.78,95.66,95.64,95.91,95.78,95.82,95.85,95.75,95.83,95.92,95.84,95.77,95.74];
+const valSingF1 = [0.0,63.83,84.01,85.29,84.93,86.7,85.25,89.39,89.12,88.36,87.22,90.33,90.21,88.88,90.15,90.39,88.7,91.12,89.53,91.17,91.19,91.41,91.44,90.51,91.39,89.38,91.58,91.23,91.96,91.59,91.54,91.79,91.08,92.11,92.13,92.41,90.95,92.19,92.35,92.36,92.33,92.53,92.45,92.49,92.48,92.55,92.56,92.4,92.54,92.46,92.45,92.56,92.48,92.56,92.52,92.55,92.57,92.65,92.62,92.53,92.57];
+const valOvlF1  = [72.27,74.86,82.19,83.84,83.96,85.63,84.49,87.2,87.96,87.82,86.37,88.51,89.2,88.23,89.43,89.43,88.04,89.68,88.63,90.3,90.1,90.3,90.34,89.82,90.45,88.39,90.19,90.28,90.97,90.67,90.45,90.6,89.74,90.03,90.64,90.93,89.63,90.8,90.89,90.99,91.03,91.03,90.91,91.19,90.91,91.19,91.07,91.09,91.03,90.96,91.03,90.81,90.64,90.81,90.83,90.85,90.95,91.02,91.07,90.8,90.91];
 
 const bestAnnotation = {
     annotations: {
         bestLine: {
-            type: 'line', xMin: 46, xMax: 46,
+            type: 'line', xMin: 45, xMax: 45,
             borderColor: 'rgba(37,99,235,0.55)', borderWidth: 2, borderDash: [6, 4],
-            label: { display: true, content: 'Best (ep 47)', position: 'start',
+            label: { display: true, content: 'Best (ep 46)', position: 'start',
                 backgroundColor: 'rgba(37,99,235,0.8)', color: '#fff', font: { size: 10, weight: 'bold' }, padding: 3 }
         },
         stopLine: {
-            type: 'line', xMin: 61, xMax: 61,
+            type: 'line', xMin: 60, xMax: 60,
             borderColor: 'rgba(239,68,68,0.55)', borderWidth: 2, borderDash: [6, 4],
-            label: { display: true, content: 'Early stop (ep 62)', position: 'start',
+            label: { display: true, content: 'Early stop (ep 61)', position: 'start',
                 backgroundColor: 'rgba(239,68,68,0.8)', color: '#fff', font: { size: 10, weight: 'bold' }, padding: 3 }
         }
     }
@@ -708,7 +706,7 @@ new Chart(document.getElementById('chartTraining'), {
     responsive: true, maintainAspectRatio: false,
     plugins: { legend: { position: 'top' }, annotation: bestAnnotation },
     scales: {
-      y: { min: 80, max: 100, ticks: { callback: v => v + '%' }, title: { display: true, text: 'Score (%)' } },
+      y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, title: { display: true, text: 'Score (%)' } },
       x: { title: { display: true, text: 'Epoch' } }
     }
   }
