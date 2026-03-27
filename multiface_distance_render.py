@@ -232,9 +232,9 @@ def draw_mvad_timeline(frame, x, y, width, height, history_labels, title, curren
     Colours (BGR):
         0 (silence)  → dark gray  (50, 50, 50)
         1 (single)   → dim green  (0, 150, 0)
-        2 (overlap)  → bright yellow  (0, 255, 255)
+        2 (overlap)  → bright orange  (0, 200, 255)
 
-    The title text and border glow yellow when the current label is overlap.
+    The title text and border glow orange when the current label is overlap.
     """
     if not frame.flags['C_CONTIGUOUS']:
         frame = np.ascontiguousarray(frame)
@@ -245,8 +245,8 @@ def draw_mvad_timeline(frame, x, y, width, height, history_labels, title, curren
 
     font = cv2.FONT_HERSHEY_SIMPLEX
 
-    # Title — yellow when overlap, white otherwise
-    title_color = (0, 255, 255) if current_label == 2 else (200, 200, 200)
+    # Title — orange when overlap, white otherwise
+    title_color = (0, 200, 255) if current_label == 2 else (200, 200, 200)
     cv2.putText(frame, title, (x + 5, y + 20), font, 0.6, title_color, 2)
 
     # Coloured bar area
@@ -258,7 +258,7 @@ def draw_mvad_timeline(frame, x, y, width, height, history_labels, title, curren
     MVAD_COLORS = {
         0: (50, 50, 50),       # silence — dark
         1: (0, 150, 0),        # single speaker — dim green
-        2: (0, 255, 255),      # overlap — bright yellow
+        2: (0, 200, 255),      # overlap — bright orange
     }
 
     n = len(history_labels)
@@ -280,9 +280,9 @@ def draw_mvad_timeline(frame, x, y, width, height, history_labels, title, curren
             color = MVAD_COLORS.get(int(history_labels[i]), (50, 50, 50))
             cv2.rectangle(frame, (px, bar_y_start), (px + pw, bar_y_start + bar_h), color, -1)
 
-    # Yellow glow border when overlap is active
+    # Orange glow border when overlap is active
     if current_label == 2:
-        cv2.rectangle(frame, (x, y), (x + width, y + height), (0, 255, 255), 2)
+        cv2.rectangle(frame, (x, y), (x + width, y + height), (0, 200, 255), 2)
 
     return frame
 
@@ -1383,9 +1383,17 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
                     frame[y1:y2, x1:x2] = blended
 
                     # Avatar border – colour indicates activity
+                    # Yellow override when MVAD signals overlap
                     _at = active_targets if active_targets else []
+                    _mvad_overlap = (mvad_data is not None
+                                     and mvad_data.get('current_label') == 2)
                     if fid in _at:
-                        border_color = (0, 255, 0) if len(_at) == 1 else (0, 255, 255)
+                        if _mvad_overlap:
+                            border_color = (0, 200, 255)   # orange — MVAD overlap
+                        elif len(_at) == 1:
+                            border_color = (0, 255, 0)     # green — single active
+                        else:
+                            border_color = (0, 255, 255)   # yellow — multi active
                         border_thick = 3
                     else:
                         border_color = (200, 200, 200)
@@ -1395,8 +1403,15 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
                 else:
                     # Placeholder: empty circle
                     _at = active_targets if active_targets else []
+                    _mvad_overlap = (mvad_data is not None
+                                     and mvad_data.get('current_label') == 2)
                     if fid in _at:
-                        ph_border = (0, 255, 0) if len(_at) == 1 else (0, 255, 255)
+                        if _mvad_overlap:
+                            ph_border = (0, 200, 255)      # orange — MVAD overlap
+                        elif len(_at) == 1:
+                            ph_border = (0, 255, 0)
+                        else:
+                            ph_border = (0, 255, 255)
                         ph_thick = 3
                     else:
                         ph_border = (100, 100, 100)
