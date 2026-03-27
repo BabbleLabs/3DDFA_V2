@@ -1152,7 +1152,8 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
                    audio_data=None, vad_data=None,
                    enrollment_collector=None, enrollment_duration=10.0,
                    face_avatars=None, active_targets=None,
-                   visible_targets=None, mvad_data=None):
+                   visible_targets=None, mvad_data=None,
+                   probationary_targets=None):
     """
     Draw dashboard overlay on frame
     
@@ -1383,15 +1384,17 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
                     frame[y1:y2, x1:x2] = blended
 
                     # Avatar border – colour indicates activity
-                    # Yellow override when MVAD signals overlap
                     _at = active_targets if active_targets else []
                     _mvad_overlap = (mvad_data is not None
                                      and mvad_data.get('current_label') == 2)
+                    _prob = probationary_targets if probationary_targets else set()
                     if fid in _at:
                         if _mvad_overlap:
                             border_color = (0, 200, 255)   # orange — MVAD overlap
+                        elif fid in _prob:
+                            border_color = (255, 200, 100) # light blue — probationary (<1s)
                         elif len(_at) == 1:
-                            border_color = (0, 255, 0)     # green — single active
+                            border_color = (0, 255, 0)     # green — confirmed active
                         else:
                             border_color = (0, 255, 255)   # yellow — multi active
                         border_thick = 3
@@ -1405,9 +1408,12 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
                     _at = active_targets if active_targets else []
                     _mvad_overlap = (mvad_data is not None
                                      and mvad_data.get('current_label') == 2)
+                    _prob = probationary_targets if probationary_targets else set()
                     if fid in _at:
                         if _mvad_overlap:
                             ph_border = (0, 200, 255)      # orange — MVAD overlap
+                        elif fid in _prob:
+                            ph_border = (255, 200, 100)    # light blue — probationary
                         elif len(_at) == 1:
                             ph_border = (0, 255, 0)
                         else:
@@ -2156,6 +2162,113 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
     # slots for faces that haven't been seen recently.
     recent_target_window = deque(maxlen=11)
 
+    # Enrollment streak tracking — eliminate fragments < 1 s.
+    # Audio is buffered during the first second of each continuous active
+    # streak.  Once the streak reaches 1 s the buffer is flushed into the
+    # enrollment collector and subsequent frames are collected normally.
+    # If the streak breaks before 1 s the buffer is discarded.
+    enrollment_streak_start = {}       # fid -> frame_idx when streak began
+    enrollment_audio_buffer = {}       # fid -> [np.ndarray chunks]
+    enrollment_streak_flushed = set()  # fids whose buffer has been flushed
+
+    # ── Pre-compute enrollment segment durations (two-pass) ──────────────
+    # Determine which enrollment-eligible segments are shorter than 1 s
+    # BEFORE rendering so the dashboard can colour-code them correctly
+    # from the very first frame (light-blue for short segments, green for
+    # long ones).  Without this, every segment starts blue for 1 s, even
+    # those that will ultimately last much longer.
+    short_enrollment_frames = {}  # fid -> frozenset of frame indices in <1 s segments
+
+    if enrollment_collector is not None and smoothed_audio_vad is not None:
+        print("  Pre-computing enrollment segment durations …")
+        # Pre-group mouth landmarks by rounded timestamp for O(1) lookup
+        _ts_series = df_mouth['seconds'].round(6)
+        _mouth_by_ts = {ts: grp for ts, grp in df_mouth.groupby(_ts_series)}
+
+        _eligible_runs = {}  # fid -> [frame_idx, …]
+
+        _total = len(df_face_count)
+        for _fi in range(_total):
+            _ts = _fi / fps
+            _tk = round(_ts, 6)
+
+            # ---- face distances (point 63) ----
+            _grp = _mouth_by_ts.get(_tk)
+            _fd = {}
+            if _grp is not None:
+                for _, _r in _grp[_grp['point_type'] == 63].iterrows():
+                    _fd[int(_r['face_idx'])] = calculate_distance(_r['z'])
+
+            # ---- audio VAD ----
+            _avad = bool(smoothed_audio_vad[_fi]) if _fi < len(smoothed_audio_vad) else False
+
+            # ---- V-VAD decisions ----
+            _vvd = {}
+            if _fd and _grp is not None:
+                for _fid in sorted(_fd):
+                    _flm = _grp[_grp['face_idx'] == _fid]
+                    if _flm.empty:
+                        continue
+                    _pts = {}
+                    for _, _r in _flm.iterrows():
+                        _pts[int(_r['point_type'])] = (
+                            float(_r['x']), float(_r['y']), float(_r['z']))
+                    if isinstance(vvad_detector, DNN_VVAD_Detector):
+                        if len(_pts) >= 68:
+                            _act, _, _ = vvad_detector.update(_fid, _pts)
+                            _vvd[_fid] = _act
+                    else:
+                        _fp = frontalize_mouth_landmarks(_pts)
+                        if _fp:
+                            _m = compute_mouth_aspect_ratio(_fp)
+                            _act, _, _ = vvad_detector.update(_fid, _m)
+                            _vvd[_fid] = _act
+
+            # ---- active targets ----
+            _active = [f for f, d in _fd.items()
+                       if d <= target_distance and _avad and _vvd.get(f, False)]
+
+            # ---- MVAD overlap ----
+            _ovl = False
+            if mvad_labels is not None and mvad_hop_sec and mvad_hop_sec > 0:
+                _mi = min(int(_ts / mvad_hop_sec), len(mvad_labels) - 1)
+                if _mi >= 0:
+                    _ovl = (int(mvad_labels[_mi]) == 2)
+
+            # ---- enrollment eligibility (ignoring is_completed) ----
+            if len(_active) == 1 and not _ovl:
+                _eligible_runs.setdefault(_active[0], []).append(_fi)
+
+        # Segment consecutive eligible frames and find short (<1 s) segments
+        for _fid, _frames in _eligible_runs.items():
+            _short = set()
+            _seg_start = 0
+            for _i in range(1, len(_frames)):
+                if _frames[_i] != _frames[_i - 1] + 1:
+                    _seg = _frames[_seg_start:_i]
+                    if len(_seg) / fps < 1.0:
+                        _short.update(_seg)
+                    _seg_start = _i
+            _seg = _frames[_seg_start:]
+            if len(_seg) / fps < 1.0:
+                _short.update(_seg)
+            if _short:
+                short_enrollment_frames[_fid] = frozenset(_short)
+
+        # Reset V-VAD detector state before the actual render pass
+        if isinstance(vvad_detector, DNN_VVAD_Detector):
+            vvad_detector._landmark_windows.clear()
+            vvad_detector._hold_counter.clear()
+            vvad_detector._smoothed_prob.clear()
+        else:
+            vvad_detector._history.clear()
+            vvad_detector._hold_counter.clear()
+            vvad_detector._smoothed_prob.clear()
+
+        _n = sum(len(s) for s in short_enrollment_frames.values())
+        print(f"    → {_n} frames in short (<1 s) segments "
+              f"across {len(short_enrollment_frames)} face(s)")
+
     # Process each frame
     for frame_idx, frame in enumerate(tqdm(reader, total=len(df_face_count))):
         # RGB to BGR for OpenCV - ensure contiguous array
@@ -2375,6 +2488,40 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
                 'current_label': mvad_current_label,
             }
 
+        # ── Enrollment streak tracking (min 1 s) ──────────────────────
+        # Determine the single enrollment-eligible face (if any).
+        # A face is eligible when: single active target, no MVAD overlap,
+        # and enrollment not yet completed.
+        mvad_is_overlap = (mvad_current_label == 2)
+        enrollment_eligible_fid = None
+        if (enrollment_collector is not None and audio_samples is not None
+                and len(active_targets) == 1 and not mvad_is_overlap):
+            _fid = active_targets[0]
+            if not enrollment_collector.is_completed(_fid):
+                enrollment_eligible_fid = _fid
+
+        # Break streaks for faces that are no longer eligible
+        for _fid in list(enrollment_streak_start):
+            if _fid != enrollment_eligible_fid:
+                enrollment_streak_start.pop(_fid)
+                enrollment_audio_buffer.pop(_fid, None)
+                enrollment_streak_flushed.discard(_fid)
+
+        # Start or continue streak; determine probationary set
+        probationary_targets = set()
+        if enrollment_eligible_fid is not None:
+            _fid = enrollment_eligible_fid
+            if _fid not in enrollment_streak_start:
+                enrollment_streak_start[_fid] = frame_idx
+                enrollment_audio_buffer[_fid] = []
+            streak_sec = (frame_idx - enrollment_streak_start[_fid]) / fps
+            # Show light-blue (probationary) ONLY for segments that are
+            # pre-computed to be shorter than 1 s.  Long segments show
+            # green from the very first frame.
+            if (streak_sec < 1.0
+                    and frame_idx in short_enrollment_frames.get(_fid, frozenset())):
+                probationary_targets.add(_fid)
+
         # Draw dashboard overlay
         frame_bgr = draw_dashboard(frame_bgr, frame_idx, face_count, face_distances, timestamp,
                                    audio_data, vad_data,
@@ -2383,7 +2530,8 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
                                    face_avatars=persistent_face_avatars,
                                    active_targets=active_targets,
                                    visible_targets=visible_targets,
-                                   mvad_data=mvad_data_dict)
+                                   mvad_data=mvad_data_dict,
+                                   probationary_targets=probationary_targets)
 
         # Draw facial landmarks for all detected faces (with V-VAD coloring)
         # Uses speaking_override to avoid double state updates on the detector.
@@ -2396,19 +2544,33 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
                     speaking_override=vvad_decisions_frame.get(face_idx, False)
                 )
 
-        # ── Enrollment audio collection ────────────────────────────────────
-        # Block enrollment when MVAD indicates overlap (label == 2)
-        mvad_is_overlap = (mvad_current_label == 2)
-        if enrollment_collector is not None and audio_samples is not None:
-            if len(active_targets) == 1 and not mvad_is_overlap:
-                fid = active_targets[0]
-                if not enrollment_collector.is_completed(fid):
-                    s_start = int(frame_idx / fps * audio_sr)
-                    s_end = int((frame_idx + 1) / fps * audio_sr)
-                    s_end = min(s_end, len(audio_samples))
-                    if s_end > s_start:
-                        enrollment_collector.add_audio(
-                            fid, audio_samples[s_start:s_end])
+        # ── Enrollment audio collection (streak-aware) ─────────────────
+        # For segments pre-computed as SHORT (<1 s): audio is buffered
+        # during the entire segment and discarded when the streak breaks.
+        # For segments pre-computed as LONG (≥1 s): audio is collected
+        # directly from the very first frame (no buffering delay).
+        if enrollment_eligible_fid is not None:
+            _fid = enrollment_eligible_fid
+            s_start = int(frame_idx / fps * audio_sr)
+            s_end = int((frame_idx + 1) / fps * audio_sr)
+            s_end = min(s_end, len(audio_samples))
+            if s_end > s_start:
+                chunk = audio_samples[s_start:s_end]
+                streak_sec = (frame_idx - enrollment_streak_start[_fid]) / fps
+                _is_short_seg = frame_idx in short_enrollment_frames.get(
+                    _fid, frozenset())
+                if streak_sec >= 1.0 or not _is_short_seg:
+                    # Long segment (known from pre-computation) or past 1 s
+                    # — flush any buffered audio and collect directly.
+                    if _fid not in enrollment_streak_flushed:
+                        enrollment_streak_flushed.add(_fid)
+                        for buf_chunk in enrollment_audio_buffer.pop(_fid, []):
+                            enrollment_collector.add_audio(_fid, buf_chunk)
+                    enrollment_collector.add_audio(_fid, chunk)
+                else:
+                    # Short segment — buffer (will be discarded on break)
+                    enrollment_audio_buffer.setdefault(_fid, []).append(
+                        chunk.copy())
 
         # Speaker avatars are now drawn inside the dashboard Enrollment section
         
