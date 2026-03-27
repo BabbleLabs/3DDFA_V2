@@ -225,6 +225,68 @@ def draw_line_graph(frame, x, y, width, height, data_points, title, show_value=F
     return frame
 
 
+def draw_mvad_timeline(frame, x, y, width, height, history_labels, title, current_label):
+    """
+    Draw a coloured Multivoice VAD timeline on the dashboard.
+
+    Colours (BGR):
+        0 (silence)  → dark gray  (50, 50, 50)
+        1 (single)   → dim green  (0, 150, 0)
+        2 (overlap)  → bright yellow  (0, 255, 255)
+
+    The title text and border glow yellow when the current label is overlap.
+    """
+    if not frame.flags['C_CONTIGUOUS']:
+        frame = np.ascontiguousarray(frame)
+
+    # Background
+    cv2.rectangle(frame, (x, y), (x + width, y + height), (30, 30, 30), -1)
+    cv2.rectangle(frame, (x, y), (x + width, y + height), (200, 200, 200), 1)
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
+    # Title — yellow when overlap, white otherwise
+    title_color = (0, 255, 255) if current_label == 2 else (200, 200, 200)
+    cv2.putText(frame, title, (x + 5, y + 20), font, 0.6, title_color, 2)
+
+    # Coloured bar area
+    bar_y_start = y + 30
+    bar_h = height - 40
+    bar_margin = 5
+    usable_width = width - 2 * bar_margin
+
+    MVAD_COLORS = {
+        0: (50, 50, 50),       # silence — dark
+        1: (0, 150, 0),        # single speaker — dim green
+        2: (0, 255, 255),      # overlap — bright yellow
+    }
+
+    n = len(history_labels)
+    if n > 0:
+        # Max-pool downsample if more data points than pixels (preserves overlap)
+        if n > usable_width:
+            bin_size = n / usable_width
+            pooled = []
+            for i in range(usable_width):
+                s = int(i * bin_size)
+                e = max(s + 1, int((i + 1) * bin_size))
+                pooled.append(int(max(history_labels[s:e])))
+            history_labels = pooled
+            n = len(history_labels)
+
+        for i in range(n):
+            px = x + bar_margin + int(i * usable_width / n)
+            pw = max(1, int((i + 1) * usable_width / n) - int(i * usable_width / n))
+            color = MVAD_COLORS.get(int(history_labels[i]), (50, 50, 50))
+            cv2.rectangle(frame, (px, bar_y_start), (px + pw, bar_y_start + bar_h), color, -1)
+
+    # Yellow glow border when overlap is active
+    if current_label == 2:
+        cv2.rectangle(frame, (x, y), (x + width, y + height), (0, 255, 255), 2)
+
+    return frame
+
+
 def frontalize_mouth_landmarks(points_3d):
     """
     Frontalize mouth landmark points by estimating and removing head rotation.
@@ -1090,7 +1152,7 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
                    audio_data=None, vad_data=None,
                    enrollment_collector=None, enrollment_duration=10.0,
                    face_avatars=None, active_targets=None,
-                   visible_targets=None):
+                   visible_targets=None, mvad_data=None):
     """
     Draw dashboard overlay on frame
     
@@ -1141,7 +1203,8 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
         _n_enroll_slots = 0
     enroll_slot_h = 62  # avatar_dim(56) + 6
     enrollment_section_height = (10 + 22 + 25 + _n_enroll_slots * enroll_slot_h) if _n_enroll_slots > 0 else 0
-    panel_height = 65 + 114 + 38 + 76 + enrollment_section_height + 280 + 100 + 20
+    mvad_section_height = 100 if mvad_data is not None else 0
+    panel_height = 65 + 114 + 38 + 76 + enrollment_section_height + 280 + mvad_section_height + 100 + 20
     
     # Draw solid background panel (more opaque for better visibility)
     overlay = frame.copy()
@@ -1505,35 +1568,61 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
                        (legend_x + box_size + 6, text_y),
                        font, legend_font_scale, (200, 200, 200), legend_thickness)
     
-    # Draw VAD (Voice Activity Detection) graph section
-    if vad_data is not None:
+    # Advance past the second pie chart area (if audio was drawn)
+    if audio_data is not None:
         current_y += pie_radius * 2 + 40
-        
-        # Draw separator
-        cv2.line(frame, 
-                 (panel_x + 10, current_y), 
+
+    # Draw Multivoice VAD (MVAD) overlap indicator section
+    if mvad_data is not None:
+        cv2.line(frame,
+                 (panel_x + 10, current_y),
                  (panel_x + panel_width - 10, current_y),
                  (220, 220, 220), 2)
-        
         current_y += 20
-        
+
+        graph_width = panel_width - 20
+        graph_height = 70
+        graph_x = panel_x + 10
+        graph_y = current_y - 10
+
+        frame = draw_mvad_timeline(
+            frame, graph_x, graph_y, graph_width, graph_height,
+            mvad_data['history'], "Multivoice VAD",
+            mvad_data['current_label']
+        )
+        current_y += graph_height
+
+    # Draw VAD (Voice Activity Detection) graph section
+    if vad_data is not None:
+        # If MVAD was not drawn but audio was, still need to advance past pie charts
+        if mvad_data is None and audio_data is not None:
+            current_y += pie_radius * 2 + 40
+
+        # Draw separator
+        cv2.line(frame,
+                 (panel_x + 10, current_y),
+                 (panel_x + panel_width - 10, current_y),
+                 (220, 220, 220), 2)
+
+        current_y += 20
+
         # Draw VAD graph
         graph_width = panel_width - 20
         graph_height = 70  # Reduced height since we're not showing the value
         graph_x = panel_x + 10
         graph_y = current_y - 10
-        
+
         frame = draw_line_graph(
-            frame, 
-            graph_x, 
-            graph_y, 
-            graph_width, 
+            frame,
+            graph_x,
+            graph_y,
+            graph_width,
             graph_height,
             vad_data['history'],
             "Voice Activity",
             show_value=False
         )
-    
+
     return frame
 
 
@@ -1928,7 +2017,8 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
                                 show_markers=True, speaker_lookup=None, avatars=None, vvad_model_path=None,
                                 audio_vad_pad_ms=250.0, vvad_pad_ms=0.0,
                                 enrollment_duration=10.0, target_distance=2.0,
-                                debug_mode=False, enrollment_wav_path=None):
+                                debug_mode=False, enrollment_wav_path=None,
+                                mvad_labels=None, mvad_hop_sec=None):
     """
     Render annotated video with dashboard overlay and speaker avatars.
     
@@ -1956,6 +2046,11 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
         enrollment_wav_path: Path to WAV file used as source audio for enrollment
                              (e.g. the *_txfeOut.wav from dumps/). If None,
                              enrollment audio collection is disabled.
+        mvad_labels: 1-D int32 array of Multivoice VAD labels (0=silence,
+                     1=single, 2=overlap) loaded from dumps/mvad_dnn.npz.
+                     When label==2, enrollment audio collection is blocked.
+        mvad_hop_sec: Time step in seconds between consecutive MVAD labels
+                      (typically 0.01 for 10 ms hop).
     """
     print(f"\nReading video: {video_path}")
     reader = imageio.get_reader(video_path)
@@ -2249,6 +2344,22 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
         # Union of all target talkers seen in the last 11 frames (current + 10 prev)
         visible_targets = set().union(*recent_target_window)
 
+        # ── Multivoice VAD (MVAD) — overlap detection ─────────────────
+        mvad_current_label = 0
+        mvad_data_dict = None
+        if mvad_labels is not None and mvad_hop_sec is not None and mvad_hop_sec > 0:
+            mvad_fidx = min(int(timestamp / mvad_hop_sec), len(mvad_labels) - 1)
+            if mvad_fidx >= 0:
+                mvad_current_label = int(mvad_labels[mvad_fidx])
+            # Build history for last 5 seconds
+            mvad_hist_start = max(0, int((timestamp - 5.0) / mvad_hop_sec))
+            mvad_hist_end = min(len(mvad_labels), mvad_fidx + 1)
+            mvad_history = list(mvad_labels[mvad_hist_start:mvad_hist_end])
+            mvad_data_dict = {
+                'history': mvad_history,
+                'current_label': mvad_current_label,
+            }
+
         # Draw dashboard overlay
         frame_bgr = draw_dashboard(frame_bgr, frame_idx, face_count, face_distances, timestamp,
                                    audio_data, vad_data,
@@ -2256,7 +2367,8 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
                                    enrollment_duration=enrollment_duration,
                                    face_avatars=persistent_face_avatars,
                                    active_targets=active_targets,
-                                   visible_targets=visible_targets)
+                                   visible_targets=visible_targets,
+                                   mvad_data=mvad_data_dict)
 
         # Draw facial landmarks for all detected faces (with V-VAD coloring)
         # Uses speaking_override to avoid double state updates on the detector.
@@ -2270,8 +2382,10 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
                 )
 
         # ── Enrollment audio collection ────────────────────────────────────
+        # Block enrollment when MVAD indicates overlap (label == 2)
+        mvad_is_overlap = (mvad_current_label == 2)
         if enrollment_collector is not None and audio_samples is not None:
-            if len(active_targets) == 1:
+            if len(active_targets) == 1 and not mvad_is_overlap:
                 fid = active_targets[0]
                 if not enrollment_collector.is_completed(fid):
                     s_start = int(frame_idx / fps * audio_sr)
@@ -2353,6 +2467,23 @@ def main(args):
         print(f"  Loaded VAD data: {len(df_vad)} entries")
     else:
         print(f"  No VAD data found (optional)")
+
+    # Try to load Multivoice VAD DNN predictions
+    mvad_labels = None
+    mvad_hop_sec = None
+    mvad_path = dumps_dir / 'mvad_dnn.npz'
+    if mvad_path.exists():
+        mvad_npz = np.load(str(mvad_path))
+        mvad_labels = mvad_npz['labels']
+        mvad_hop_sec = float(mvad_npz['hop_sec'])
+        n_ovl = int(np.sum(mvad_labels == 2))
+        n_sng = int(np.sum(mvad_labels == 1))
+        print(f"  Loaded MVAD DNN: {len(mvad_labels)} frames "
+              f"({len(mvad_labels) * mvad_hop_sec:.1f}s), "
+              f"single={n_sng * mvad_hop_sec:.1f}s, "
+              f"overlap={n_ovl * mvad_hop_sec:.1f}s")
+    else:
+        print(f"  No MVAD DNN data found ({mvad_path}) — overlap blocking disabled")
     
     print(f"  Loaded {len(df_face_count)} frames")
 
@@ -2428,6 +2559,8 @@ def main(args):
         target_distance=getattr(args, 'target_distance', 2.0),
         debug_mode=getattr(args, 'debug_mode', False),
         enrollment_wav_path=enrollment_wav_path,
+        mvad_labels=mvad_labels,
+        mvad_hop_sec=mvad_hop_sec,
     )
     
     print("\n" + "="*60)

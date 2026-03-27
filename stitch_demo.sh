@@ -7,8 +7,8 @@
 
 # Set up variables (absolute paths)
 TDDFA_V2_DIRECTORY_PATH="$(pwd)/"
-VIDEO_PATH="$(pwd)/inputs/example_7.mp4"
-AUDIO_PIPELINE_DIRECTORY_PATH="/work/user_data/hboratyn/repos/leapfox"
+VIDEO_PATH="$(pwd)/inputs/example_18.mp4"
+AUDIO_PIPELINE_DIRECTORY_PATH="/work/user_data/msulewsk/data/repos/leapFox/trunk_main188"
 FACENET_DIRECTORY_PATH="$(pwd)/facenet/"
 
 # Obtain audio from video and save to the same directory
@@ -32,6 +32,10 @@ cp "$AUDIO_PIPELINE_DIRECTORY_PATH/${BASENAME}"*_txfeOut.wav dumps/
 
 # Obtain video information from 3DDFA_V2
 python3 process_video.py -f "$VIDEO_PATH" --dump_results=true
+
+# Run Multivoice VAD DNN on the extracted audio and save post-filtered results
+AUDIO_WAV="inputs/$(basename "${VIDEO_PATH%.*}").wav"
+python3 run_mvad_dnn.py -i "$AUDIO_WAV" -m mvad_dnn_v2_model_ep46.pt -o dumps/mvad_dnn.npz
 
 # Obtain face embeddings from the video
 cd "$FACENET_DIRECTORY_PATH"
