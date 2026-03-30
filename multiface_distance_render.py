@@ -287,6 +287,72 @@ def draw_mvad_timeline(frame, x, y, width, height, history_labels, title, curren
     return frame
 
 
+def draw_vvad_timeline(frame, x, y, width, height, history_labels, title, current_label):
+    """
+    Draw a coloured Video VAD timeline on the dashboard.
+
+    Shows how many target talkers are simultaneously active (speaking
+    according to V-VAD, within target distance, with Audio VAD active).
+
+    Colours (BGR):
+        0 (no active target)    → dark gray   (50, 50, 50)
+        1 (single active)       → dim green   (0, 150, 0)
+        2+ (multiple active)    → light pink  (200, 150, 255)
+
+    The title text and border glow light pink when multiple targets are active.
+    """
+    if not frame.flags['C_CONTIGUOUS']:
+        frame = np.ascontiguousarray(frame)
+
+    # Background
+    cv2.rectangle(frame, (x, y), (x + width, y + height), (30, 30, 30), -1)
+    cv2.rectangle(frame, (x, y), (x + width, y + height), (200, 200, 200), 1)
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+
+    # Title — light pink when multi-active, white otherwise
+    title_color = (200, 150, 255) if current_label >= 2 else (200, 200, 200)
+    cv2.putText(frame, title, (x + 5, y + 20), font, 0.6, title_color, 2)
+
+    # Coloured bar area
+    bar_y_start = y + 30
+    bar_h = height - 40
+    bar_margin = 5
+    usable_width = width - 2 * bar_margin
+
+    VVAD_COLORS = {
+        0: (50, 50, 50),       # no active target — dark
+        1: (0, 150, 0),        # single active — dim green
+        2: (200, 150, 255),    # multiple active — light pink
+    }
+
+    n = len(history_labels)
+    if n > 0:
+        # Max-pool downsample if more data points than pixels (preserves multi-active)
+        if n > usable_width:
+            bin_size = n / usable_width
+            pooled = []
+            for i in range(usable_width):
+                s = int(i * bin_size)
+                e = max(s + 1, int((i + 1) * bin_size))
+                pooled.append(int(max(history_labels[s:e])))
+            history_labels = pooled
+            n = len(history_labels)
+
+        for i in range(n):
+            px = x + bar_margin + int(i * usable_width / n)
+            pw = max(1, int((i + 1) * usable_width / n) - int(i * usable_width / n))
+            lbl = min(int(history_labels[i]), 2)
+            color = VVAD_COLORS.get(lbl, (50, 50, 50))
+            cv2.rectangle(frame, (px, bar_y_start), (px + pw, bar_y_start + bar_h), color, -1)
+
+    # Light pink glow border when multiple targets are active
+    if current_label >= 2:
+        cv2.rectangle(frame, (x, y), (x + width, y + height), (200, 150, 255), 2)
+
+    return frame
+
+
 def frontalize_mouth_landmarks(points_3d):
     """
     Frontalize mouth landmark points by estimating and removing head rotation.
@@ -1153,7 +1219,7 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
                    enrollment_collector=None, enrollment_duration=10.0,
                    face_avatars=None, active_targets=None,
                    visible_targets=None, mvad_data=None,
-                   probationary_targets=None):
+                   probationary_targets=None, vvad_data=None):
     """
     Draw dashboard overlay on frame
     
@@ -1205,7 +1271,8 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
     enroll_slot_h = 62  # avatar_dim(56) + 6
     enrollment_section_height = (10 + 22 + 25 + _n_enroll_slots * enroll_slot_h) if _n_enroll_slots > 0 else 0
     mvad_section_height = 100 if mvad_data is not None else 0
-    panel_height = 65 + 114 + 38 + 76 + enrollment_section_height + 280 + mvad_section_height + 100 + 20
+    vvad_section_height = 100 if vvad_data is not None else 0
+    panel_height = 65 + 114 + 38 + 76 + enrollment_section_height + 280 + mvad_section_height + vvad_section_height + 100 + 20
     
     # Draw solid background panel (more opaque for better visibility)
     overlay = frame.copy()
@@ -1396,7 +1463,7 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
                         elif len(_at) == 1:
                             border_color = (0, 255, 0)     # green — confirmed active
                         else:
-                            border_color = (0, 255, 255)   # yellow — multi active
+                            border_color = (200, 150, 255) # light pink — multi active
                         border_thick = 3
                     else:
                         border_color = (200, 200, 200)
@@ -1417,7 +1484,7 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
                         elif len(_at) == 1:
                             ph_border = (0, 255, 0)
                         else:
-                            ph_border = (0, 255, 255)
+                            ph_border = (200, 150, 255)    # light pink — multi active
                         ph_thick = 3
                     else:
                         ph_border = (100, 100, 100)
@@ -1464,137 +1531,9 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
 
             current_y += enroll_slot_height
 
-    # Draw Audio section separator
-    current_y += 10
-    cv2.line(frame, 
-             (panel_x + 10, current_y), 
-             (panel_x + panel_width - 10, current_y),
-             (220, 220, 220), 2)
-    
-    current_y += 28
-    
-    # Draw AUDIO title
-    cv2.putText(frame, "Audio Metrics", 
-                (panel_x + 10, current_y),
-                font, title_font_scale, text_color, title_thickness)
-    
-    current_y += 35  # Increased spacing before first pie chart
-    
-    # Define pie chart dimensions
-    pie_radius = 45
-    pie_center_x = panel_x + pie_radius + 10
-    
-    # Draw audio pie charts if data is available
-    if audio_data is not None:
-        
-        # Color scheme for audio categories (BGR format)
-        colors = {
-            'near_talker': (228, 119, 31),   # Blue
-            'far_talker': (48, 172, 119),    # Green
-            'noise': (25, 50, 220),          # Red
-            'silence': (208, 224, 64),       # Turquoise
-            'unknown': (180, 180, 180),      # Gray
-        }
-        
-        # Category display names
-        display_names = {
-            'near_talker': 'NT',
-            'far_talker': 'FT',
-            'noise': 'Noise',
-            'silence': 'Silence',
-            'unknown': 'Unknown',
-        }
-        
-        category_order = ['near_talker', 'far_talker', 'noise', 'silence', 'unknown']
-        
-        # Draw "BNR Input" pie chart with legend
-        pie_center_y = current_y + pie_radius
-        frame = draw_pie_chart(frame, pie_center_x, pie_center_y, pie_radius, 
-                               audio_data['before_bnr'], "BNR Input", show_legend=False)
-        
-        # Draw legend for BNR Input - Layout: pie | percentages | legend names
-        percentages_x = pie_center_x + pie_radius + 5
-        legend_x = percentages_x + 44  # Moved right from 38
-        legend_y = pie_center_y - pie_radius + 10
-        legend_line_height = 20  # Reduced for smaller font
-        legend_font_scale = 0.64  # Reduced by 20% from 0.8
-        legend_thickness = 1  # Thinner for smaller font
-        
-        for i, category in enumerate(category_order):
-            color = colors.get(category, (127, 127, 127))
-            y_pos = legend_y + (i * legend_line_height)
-            percentage = audio_data['before_bnr'].get(category, 0)
-            
-            # Adjust text baseline to align with box center
-            text_y = y_pos + 5  # Move text down to align with box
-            
-            # Draw percentage (rounded to integer)
-            percentage_text = f"{percentage:.0f}%"
-            cv2.putText(frame, percentage_text, 
-                       (percentages_x, text_y),
-                       font, legend_font_scale, (200, 200, 200), legend_thickness)
-            
-            # Draw color box (smaller to match reduced font)
-            box_size = 13  # Reduced from 16
-            cv2.rectangle(frame, 
-                         (legend_x, y_pos - 6), 
-                         (legend_x + box_size, y_pos + 7), 
-                         color, -1)
-            cv2.rectangle(frame, 
-                         (legend_x, y_pos - 6), 
-                         (legend_x + box_size, y_pos + 7), 
-                         (200, 200, 200), 1)
-            
-            # Draw legend name
-            text = f"{display_names[category]}"
-            cv2.putText(frame, text, 
-                       (legend_x + box_size + 6, text_y),
-                       font, legend_font_scale, (200, 200, 200), legend_thickness)
-        
-        current_y += pie_radius * 2 + 35
-        
-        # Draw "System Output" pie chart with legend
-        pie_center_y = current_y + pie_radius
-        frame = draw_pie_chart(frame, pie_center_x, pie_center_y, pie_radius, 
-                               audio_data['after_bnr'], "System Output", show_legend=False)
-        
-        # Draw legend for System Output - Layout: pie | percentages | legend names
-        legend_y = pie_center_y - pie_radius + 10
-        
-        for i, category in enumerate(category_order):
-            color = colors.get(category, (127, 127, 127))
-            y_pos = legend_y + (i * legend_line_height)
-            percentage = audio_data['after_bnr'].get(category, 0)
-            text_y = y_pos + 5
-            # Draw percentage (rounded to integer)
-            percentage_text = f"{percentage:.0f}%"
-            cv2.putText(frame, percentage_text, 
-                       (percentages_x, text_y),
-                       font, legend_font_scale, (200, 200, 200), legend_thickness)
-            
-            # Draw color box (smaller to match reduced font)
-            box_size = 13  # Reduced from 16
-            cv2.rectangle(frame, 
-                         (legend_x, y_pos - 8), 
-                         (legend_x + box_size, y_pos + 5), 
-                         color, -1)
-            cv2.rectangle(frame, 
-                         (legend_x, y_pos - 8), 
-                         (legend_x + box_size, y_pos + 5), 
-                         (200, 200, 200), 1)
-            
-            # Draw legend name
-            text = f"{display_names[category]}"
-            cv2.putText(frame, text, 
-                       (legend_x + box_size + 6, text_y),
-                       font, legend_font_scale, (200, 200, 200), legend_thickness)
-    
-    # Advance past the second pie chart area (if audio was drawn)
-    if audio_data is not None:
-        current_y += pie_radius * 2 + 40
-
-    # Draw Multivoice VAD (MVAD) overlap indicator section
+    # ── Multivoice VAD (MVAD) overlap indicator section ──────────────
     if mvad_data is not None:
+        current_y += 10
         cv2.line(frame,
                  (panel_x + 10, current_y),
                  (panel_x + panel_width - 10, current_y),
@@ -1613,23 +1552,36 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
         )
         current_y += graph_height
 
-    # Draw VAD (Voice Activity Detection) graph section
-    if vad_data is not None:
-        # If MVAD was not drawn but audio was, still need to advance past pie charts
-        if mvad_data is None and audio_data is not None:
-            current_y += pie_radius * 2 + 40
-
-        # Draw separator
+    # ── Video VAD timeline section (active target talker count) ────
+    if vvad_data is not None:
         cv2.line(frame,
                  (panel_x + 10, current_y),
                  (panel_x + panel_width - 10, current_y),
                  (220, 220, 220), 2)
-
         current_y += 20
 
-        # Draw VAD graph
         graph_width = panel_width - 20
-        graph_height = 70  # Reduced height since we're not showing the value
+        graph_height = 70
+        graph_x = panel_x + 10
+        graph_y = current_y - 10
+
+        frame = draw_vvad_timeline(
+            frame, graph_x, graph_y, graph_width, graph_height,
+            vvad_data['history'], "Video VAD",
+            vvad_data['current_label']
+        )
+        current_y += graph_height
+
+    # ── Voice Activity Detection (Audio VAD) graph ─────────────────
+    if vad_data is not None:
+        cv2.line(frame,
+                 (panel_x + 10, current_y),
+                 (panel_x + panel_width - 10, current_y),
+                 (220, 220, 220), 2)
+        current_y += 20
+
+        graph_width = panel_width - 20
+        graph_height = 70
         graph_x = panel_x + 10
         graph_y = current_y - 10
 
@@ -1643,6 +1595,114 @@ def draw_dashboard(frame, frame_idx, face_count, face_distances, timestamp,
             "Voice Activity",
             show_value=False
         )
+        current_y += graph_height
+
+    # ── Audio Metrics section (pie charts — at the bottom) ─────────
+    current_y += 10
+    cv2.line(frame,
+             (panel_x + 10, current_y),
+             (panel_x + panel_width - 10, current_y),
+             (220, 220, 220), 2)
+    current_y += 28
+
+    cv2.putText(frame, "Audio Metrics",
+                (panel_x + 10, current_y),
+                font, title_font_scale, text_color, title_thickness)
+    current_y += 35
+
+    pie_radius = 45
+    pie_center_x = panel_x + pie_radius + 10
+
+    if audio_data is not None:
+        # Color scheme for audio categories (BGR format)
+        colors = {
+            'near_talker': (228, 119, 31),   # Blue
+            'far_talker': (48, 172, 119),    # Green
+            'noise': (25, 50, 220),          # Red
+            'silence': (208, 224, 64),       # Turquoise
+            'unknown': (180, 180, 180),      # Gray
+        }
+        display_names = {
+            'near_talker': 'NT',
+            'far_talker': 'FT',
+            'noise': 'Noise',
+            'silence': 'Silence',
+            'unknown': 'Unknown',
+        }
+        category_order = ['near_talker', 'far_talker', 'noise', 'silence', 'unknown']
+
+        # Draw "BNR Input" pie chart with legend
+        pie_center_y = current_y + pie_radius
+        frame = draw_pie_chart(frame, pie_center_x, pie_center_y, pie_radius,
+                               audio_data['before_bnr'], "BNR Input", show_legend=False)
+
+        percentages_x = pie_center_x + pie_radius + 5
+        legend_x = percentages_x + 44
+        legend_y = pie_center_y - pie_radius + 10
+        legend_line_height = 20
+        legend_font_scale = 0.64
+        legend_thickness = 1
+
+        for i, category in enumerate(category_order):
+            color = colors.get(category, (127, 127, 127))
+            y_pos = legend_y + (i * legend_line_height)
+            percentage = audio_data['before_bnr'].get(category, 0)
+            text_y = y_pos + 5
+
+            percentage_text = f"{percentage:.0f}%"
+            cv2.putText(frame, percentage_text,
+                       (percentages_x, text_y),
+                       font, legend_font_scale, (200, 200, 200), legend_thickness)
+
+            box_size = 13
+            cv2.rectangle(frame,
+                         (legend_x, y_pos - 6),
+                         (legend_x + box_size, y_pos + 7),
+                         color, -1)
+            cv2.rectangle(frame,
+                         (legend_x, y_pos - 6),
+                         (legend_x + box_size, y_pos + 7),
+                         (200, 200, 200), 1)
+
+            text = f"{display_names[category]}"
+            cv2.putText(frame, text,
+                       (legend_x + box_size + 6, text_y),
+                       font, legend_font_scale, (200, 200, 200), legend_thickness)
+
+        current_y += pie_radius * 2 + 35
+
+        # Draw "System Output" pie chart with legend
+        pie_center_y = current_y + pie_radius
+        frame = draw_pie_chart(frame, pie_center_x, pie_center_y, pie_radius,
+                               audio_data['after_bnr'], "System Output", show_legend=False)
+
+        legend_y = pie_center_y - pie_radius + 10
+
+        for i, category in enumerate(category_order):
+            color = colors.get(category, (127, 127, 127))
+            y_pos = legend_y + (i * legend_line_height)
+            percentage = audio_data['after_bnr'].get(category, 0)
+            text_y = y_pos + 5
+
+            percentage_text = f"{percentage:.0f}%"
+            cv2.putText(frame, percentage_text,
+                       (percentages_x, text_y),
+                       font, legend_font_scale, (200, 200, 200), legend_thickness)
+
+            box_size = 13
+            cv2.rectangle(frame,
+                         (legend_x, y_pos - 8),
+                         (legend_x + box_size, y_pos + 5),
+                         color, -1)
+            cv2.rectangle(frame,
+                         (legend_x, y_pos - 8),
+                         (legend_x + box_size, y_pos + 5),
+                         (200, 200, 200), 1)
+
+            text = f"{display_names[category]}"
+            cv2.putText(frame, text,
+                       (legend_x + box_size + 6, text_y),
+                       font, legend_font_scale, (200, 200, 200), legend_thickness)
 
     return frame
 
@@ -2171,6 +2231,10 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
     enrollment_audio_buffer = {}       # fid -> [np.ndarray chunks]
     enrollment_streak_flushed = set()  # fids whose buffer has been flushed
 
+    # Video VAD label history — one label per video frame.
+    # 0 = no active target, 1 = single active, 2 = multiple active
+    vvad_label_history = []
+
     # ── Pre-compute enrollment segment durations (two-pass) ──────────────
     # Determine which enrollment-eligible segments are shorter than 1 s
     # BEFORE rendering so the dashboard can colour-code them correctly
@@ -2464,6 +2528,15 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
             active_targets = [fid for fid, active in target_active.items()
                               if active]
 
+        # ── Video VAD label (for dashboard timeline) ─────────────────
+        # 0 = no active target, 1 = single, 2+ = multiple active
+        vvad_label = 0
+        if len(active_targets) == 1:
+            vvad_label = 1
+        elif len(active_targets) > 1:
+            vvad_label = 2
+        vvad_label_history.append(vvad_label)
+
         # Track which target talkers are visible in this frame (within distance)
         frame_visible_targets = set(
             fid for fid, dist in face_distances.items() if dist <= target_distance
@@ -2522,6 +2595,15 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
                     and frame_idx in short_enrollment_frames.get(_fid, frozenset())):
                 probationary_targets.add(_fid)
 
+        # ── Build Video VAD data for dashboard timeline ────────────────
+        vvad_data_dict = None
+        if enrollment_collector is not None:
+            vvad_hist_frames = int(5.0 * fps)
+            vvad_data_dict = {
+                'history': vvad_label_history[-vvad_hist_frames:],
+                'current_label': vvad_label,
+            }
+
         # Draw dashboard overlay
         frame_bgr = draw_dashboard(frame_bgr, frame_idx, face_count, face_distances, timestamp,
                                    audio_data, vad_data,
@@ -2531,7 +2613,8 @@ def render_video_with_dashboard(video_path, df_face_count, df_mouth, df_mqe, df_
                                    active_targets=active_targets,
                                    visible_targets=visible_targets,
                                    mvad_data=mvad_data_dict,
-                                   probationary_targets=probationary_targets)
+                                   probationary_targets=probationary_targets,
+                                   vvad_data=vvad_data_dict)
 
         # Draw facial landmarks for all detected faces (with V-VAD coloring)
         # Uses speaking_override to avoid double state updates on the detector.

@@ -91,10 +91,20 @@ clear; clc; close all;
 % singleTalk = [7.25 22.5; 32.23 49.35];
 % doubleTalk = [0.36 6.57; 23.47 32.08];
 
+% audioPath = 'inputs/';
+% audioName = 'example_24.wav';
+% singleTalk = [7.32 21.82; 32.77 48.34];
+% doubleTalk = [0.55 6.07; 23.16 32.25];
+
+% audioPath = 'inputs/';
+% audioName = 'example_25.wav';
+% singleTalk = [0.07 9.88; 23.57 49.06];
+% doubleTalk = [9.95 23.47];
+
 audioPath = 'inputs/';
-audioName = 'example_24.wav';
-singleTalk = [7.32 21.82; 32.77 48.34];
-doubleTalk = [0.55 6.07; 23.16 32.25];
+audioName = 'example_26.wav';
+singleTalk = [1.15 12.31; 22.64 48.22];
+doubleTalk = [12.65 22.54];
 
 %% Processing
 fsTarget = 48e3;
